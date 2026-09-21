@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
+import { categoryIcon } from "./categoryIcon";
 import DiscoverModal from "./DiscoverModal";
 import { BackIcon, EditIcon, LinkIcon, SearchIcon, TrashIcon, WrenchIcon } from "./Icons";
 import LinkDocumentModal from "./LinkDocumentModal";
@@ -52,14 +53,19 @@ export default function ProductDetail({ product, onBack, onUpdated, onDeleted }:
       </button>
 
       <div className="detail-header">
-        <div>
-          <h1 className="detail-title">{product.nickname}</h1>
-          {(product.brand || product.model) && (
-            <p className="detail-subtitle">
-              {[product.brand, product.model].filter(Boolean).join(" ")}
-              {product.year ? ` · ${product.year}` : ""}
-            </p>
-          )}
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+          <span className="product-icon large" aria-hidden="true">
+            {categoryIcon(product.category)}
+          </span>
+          <div>
+            <h1 className="detail-title">{product.nickname}</h1>
+            {(product.brand || product.model) && (
+              <p className="detail-subtitle">
+                {[product.brand, product.model].filter(Boolean).join(" ")}
+                {product.year ? ` · ${product.year}` : ""}
+              </p>
+            )}
+          </div>
         </div>
         <div className="button-row">
           <button className="icon-button" onClick={() => setEditing(true)} aria-label="Edit">

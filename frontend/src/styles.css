@@ -1,4 +1,10 @@
 :root {
+  /* Without this, native form controls (select dropdown lists, date-picker
+     popups, checkboxes) render with the browser's light-mode chrome even
+     though everything else here is dark — the classic cause of unreadable
+     dark-on-dark text in a custom dark theme. */
+  color-scheme: light dark;
+
   --bg: #f6f7f9;
   --surface: #ffffff;
   --surface-2: #f0f1f4;
@@ -24,6 +30,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --bg: #131417;
     --surface: #1c1e24;
     --surface-2: #24262e;
@@ -266,10 +273,39 @@ button {
   transform: scale(0.99);
 }
 
+.product-card-top {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.product-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.product-icon.large {
+  width: 48px;
+  height: 48px;
+  font-size: 24px;
+  border-radius: var(--radius-md);
+}
+
 .product-card-nickname {
   font-size: 15px;
   font-weight: 600;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .product-card-meta {

@@ -1,3 +1,4 @@
+import { categoryIcon } from "./categoryIcon";
 import { BoxIcon } from "./Icons";
 import type { Product } from "./types";
 
@@ -31,13 +32,20 @@ export default function ProductList({ products, onSelect, onAdd }: Props) {
       <div className="product-grid">
         {products.map((p) => (
           <button key={p.id} className="product-card" onClick={() => onSelect(p)}>
-            <p className="product-card-nickname">{p.nickname}</p>
-            {(p.brand || p.model) && (
-              <p className="product-card-meta">
-                {[p.brand, p.model].filter(Boolean).join(" ")}
-                {p.year ? ` · ${p.year}` : ""}
-              </p>
-            )}
+            <div className="product-card-top">
+              <span className="product-icon" aria-hidden="true">
+                {categoryIcon(p.category)}
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <p className="product-card-nickname">{p.nickname}</p>
+                {(p.brand || p.model) && (
+                  <p className="product-card-meta">
+                    {[p.brand, p.model].filter(Boolean).join(" ")}
+                    {p.year ? ` · ${p.year}` : ""}
+                  </p>
+                )}
+              </div>
+            </div>
             <div className="badge-row">
               {p.category && <span className="badge">{p.category}</span>}
               <WarrantyBadge expires={p.warranty_expires} />
