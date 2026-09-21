@@ -1,0 +1,15 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hubapp
+      POSTGRES_PASSWORD: hubapp
+      POSTGRES_DB: hubapp
+    ports:
+      # 5433, not 5432: lets this run alongside rtfm-rag's own standalone Postgres
+      # (which uses 5432) without a port conflict. Separate databases by design —
+      # see docs/specs/01-architecture.md.
+      - "5433:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data

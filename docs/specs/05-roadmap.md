@@ -5,31 +5,24 @@
 - [x] Design docs — overview, architecture, data model, discovery agent, query
   routing. Architecture revised: rtfm-rag consumed as a library (shared process/DB),
   not an HTTP service — see 01-architecture.md's revision note.
-
-## Dependencies on rtfm-rag (library-level, not API endpoints)
-
-Tracked in rtfm-rag's own roadmap, listed here for visibility since Phase 1 needs the
-first one:
-
-- [ ] `VectorStore.search()` needs an optional `document_ids` filter — the library
-  equivalent of what was previously going to be an HTTP `/api/chat` scoping param.
-- [ ] Ingestion logic needs to be cleanly importable (today it's CLI-only, wired
-  through `cli.py`'s `ingest()` — needs factoring into a plain function that doesn't
-  `raise SystemExit` and isn't argparse-shaped).
-- [ ] `LLMClient` needs a pluggable-provider refactor (Ollama today; OpenAI-compatible
-  and Anthropic as swappable alternatives) — not blocking Phase 1-3 below, but
-  blocking "bring your own LLM" and should happen before too much routing code is
-  written against the Ollama-specific client.
+- [x] rtfm-rag's three library-readiness changes (all landed in that repo): a
+  `document_ids` filter on `VectorStore.search()`, ingestion factored into an
+  importable `ingest_pdf()`, and a pluggable `LLMProvider` interface
+  (Ollama/OpenAI-compatible/Anthropic).
+- [x] Phase 1 backend: shared Postgres (hubapp's schema applied after ragapp's own),
+  FastAPI CRUD for products + maintenance log, PDF upload → `ingest_pdf()` →
+  link-to-product. Verified live end to end (see commit history).
 
 ## Phase 1 — inventory, no discovery/routing yet
 
-- [ ] Shared Postgres: rtfm-hub's schema (`products`, `product_documents`,
+- [x] Shared Postgres: rtfm-hub's schema (`products`, `product_documents`,
   `maintenance_log`) applied after rtfm-rag's own schema, in the same database.
-- [ ] FastAPI CRUD for products + maintenance log.
+- [x] FastAPI CRUD for products + maintenance log.
+- [x] Manually link a product to an already-ingested rtfm-rag document — proved via
+  the upload endpoint (`POST /products/{id}/documents/upload`), which calls
+  `ingest_pdf()` directly and links the result; a separate `POST .../documents`
+  endpoint links an already-ingested `document_id` without re-uploading.
 - [ ] Frontend: product list/detail views, add/edit product, maintenance log entries.
-- [ ] Manually link a product to an already-ingested rtfm-rag document (no discovery
-  agent yet — proves the `product_documents` FK and calling `ragapp` directly work
-  before automating discovery).
 
 ## Phase 2 — discovery agent
 
