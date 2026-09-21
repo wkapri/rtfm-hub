@@ -88,9 +88,10 @@ approval, but nothing downloads or gets treated as authoritative until you confi
 
 ## Current status
 
-Phase 1 backend done: product CRUD, maintenance log, PDF upload → ingest (via
-`ragapp.ingestion.service.ingest_pdf`, in-process) → link-to-product, all verified
-against the shared Postgres. No frontend yet. See
+**Phase 1 done**: product CRUD, maintenance log, PDF upload → ingest (via
+`ragapp.ingestion.service.ingest_pdf`, in-process) → link-to-product, plus a full
+React frontend (product list/detail, add/edit, document linking, maintenance log),
+all verified live against the shared Postgres. No discovery agent or chat yet. See
 [docs/specs/05-roadmap.md](docs/specs/05-roadmap.md).
 
 ## Prerequisites

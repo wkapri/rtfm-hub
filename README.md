@@ -11,11 +11,11 @@ See [CLAUDE.md](CLAUDE.md) for the stack/architecture summary and
 
 ## Status
 
-**Phase 1 backend done, verified end to end**: product CRUD, maintenance log, and
-PDF upload → ingest (via `ragapp`, in-process) → link-to-product all work against
-the shared Postgres database. No frontend yet, no discovery agent, no query
-routing/chat — see [docs/specs/05-roadmap.md](docs/specs/05-roadmap.md) for what's
-next.
+**Phase 1 done, verified end to end**: product CRUD, maintenance log, PDF upload →
+ingest (via `ragapp`, in-process) → link-to-product, and a full React frontend for
+all of it (list/detail views, add/edit, document linking, maintenance log). No
+discovery agent yet, no query routing/chat — see
+[docs/specs/05-roadmap.md](docs/specs/05-roadmap.md) for what's next.
 
 ## Prerequisites
 
@@ -44,6 +44,12 @@ pip install -e ..\..\rtfm-rag\backend
 pip install -e ".[dev]"
 copy ..\.env.example ..\.env
 uvicorn hubapp.api.main:app --reload --port 8001
+
+# 3. Frontend (separate terminal)
+cd frontend
+npm install
+npm run dev
 ```
 
-Frontend setup isn't written yet — no frontend exists as of Phase 1.
+Open http://localhost:5174 (5173 is rtfm-rag's own frontend — different port so both
+can run at once).

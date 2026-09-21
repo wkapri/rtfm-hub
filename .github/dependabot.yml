@@ -5,10 +5,12 @@ updates:
     schedule:
       interval: weekly
 
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-
-  # npm entry deliberately omitted — no frontend/ exists yet (Phase 1 is
-  # backend-only). Add one once the frontend is built.
