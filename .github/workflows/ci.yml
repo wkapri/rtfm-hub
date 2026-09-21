@@ -1,0 +1,43 @@
+name: CI
+
+# hubapp depends on rtfm-rag's ragapp package as a local editable install, so this
+# checks out both repos side by side (matching the local dev layout: rtfm-hub/ and
+# rtfm-rag/ as sibling directories) rather than just this one repo. Works without
+# extra secrets because rtfm-rag is public — the default GITHUB_TOKEN can read it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout rtfm-hub
+        uses: actions/checkout@v4
+        with:
+          path: rtfm-hub
+      - name: Checkout rtfm-rag (sibling dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: wkapri/rtfm-rag
+          path: rtfm-rag
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ragapp (editable, sibling repo)
+        working-directory: rtfm-rag/backend
+        run: pip install -e .
+      - name: Install hubapp
+        working-directory: rtfm-hub/backend
+        run: pip install -e ".[dev]"
+      - name: Lint
+        working-directory: rtfm-hub/backend
+        run: ruff check src tests
+      - name: Test
+        working-directory: rtfm-hub/backend
+        run: pytest -q
+
+  # No frontend job yet — Phase 1 has no frontend. Add one (mirroring rtfm-rag's CI)
+  # once frontend/ exists.
