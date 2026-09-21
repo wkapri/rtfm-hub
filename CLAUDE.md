@@ -88,7 +88,9 @@ approval, but nothing downloads or gets treated as authoritative until you confi
 
 ## Current status
 
-Design phase — docs/specs/ only, no code yet. See
+Phase 1 backend done: product CRUD, maintenance log, PDF upload → ingest (via
+`ragapp.ingestion.service.ingest_pdf`, in-process) → link-to-product, all verified
+against the shared Postgres. No frontend yet. See
 [docs/specs/05-roadmap.md](docs/specs/05-roadmap.md).
 
 ## Prerequisites

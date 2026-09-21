@@ -11,10 +11,11 @@ See [CLAUDE.md](CLAUDE.md) for the stack/architecture summary and
 
 ## Status
 
-**Design phase — no code yet.** The specs are written; implementation follows the
-phases in [docs/specs/05-roadmap.md](docs/specs/05-roadmap.md), starting with plain
-inventory CRUD (no discovery agent or routing yet) so the data model and the
-rtfm-rag integration point get proven out before adding the harder pieces.
+**Phase 1 backend done, verified end to end**: product CRUD, maintenance log, and
+PDF upload → ingest (via `ragapp`, in-process) → link-to-product all work against
+the shared Postgres database. No frontend yet, no discovery agent, no query
+routing/chat — see [docs/specs/05-roadmap.md](docs/specs/05-roadmap.md) for what's
+next.
 
 ## Prerequisites
 
@@ -27,4 +28,22 @@ rtfm-hub imports rtfm-rag's `ragapp` package directly rather than calling it ove
 HTTP, so **rtfm-rag's own Docker Compose/backend/frontend don't need to be running**
 — rtfm-hub has its own Postgres (shared schema with `ragapp`'s tables) and calls
 `ragapp`'s Python functions in-process. You do need `ragapp` installed as an editable
-package in this project's venv, though — see setup below.
+package in this project's venv, though.
+
+## Setup
+
+```powershell
+# 1. Start this project's own Postgres (separate from rtfm-rag's own standalone one)
+docker compose up -d
+
+# 2. Backend — ragapp (rtfm-rag) installed as an editable sibling dependency
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e ..\..\rtfm-rag\backend
+pip install -e ".[dev]"
+copy ..\.env.example ..\.env
+uvicorn hubapp.api.main:app --reload --port 8001
+```
+
+Frontend setup isn't written yet — no frontend exists as of Phase 1.
