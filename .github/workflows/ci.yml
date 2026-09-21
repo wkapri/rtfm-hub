@@ -15,11 +15,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout rtfm-hub
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: rtfm-hub
       - name: Checkout rtfm-rag (sibling dependency)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: wkapri/rtfm-rag
           path: rtfm-rag
@@ -45,7 +45,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
