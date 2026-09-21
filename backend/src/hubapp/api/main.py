@@ -10,6 +10,7 @@ from ragapp.ingestion.service import IngestionError, ingest_pdf
 from ragapp.retrieval.store import VectorStore
 
 from hubapp.db import init_schema
+from hubapp.discovery.service import DiscoveryError, ingest_candidate, search_manual
 from hubapp.products.store import ProductStore
 
 app = FastAPI(title="rtfm-hub")
@@ -107,6 +108,22 @@ class MaintenanceOut(BaseModel):
     created_at: datetime
 
 
+class CandidateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    title: str
+    url: str
+    domain: str
+    source: str
+    match_reasons: list[str]
+
+
+class ApproveCandidateRequest(BaseModel):
+    url: str
+    title: str
+    document_kind: str = "owners_manual"
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
@@ -193,3 +210,28 @@ def add_maintenance(product_id: str, request: MaintenanceCreate):
     if products.get(product_id) is None:
         raise HTTPException(status_code=404, detail="Product not found")
     return products.add_maintenance(product_id, request.date, request.description, request.cost)
+
+
+@app.get("/api/products/{product_id}/discover", response_model=list[CandidateOut])
+def discover_manual(product_id: str):
+    """Search + rank candidate manuals. No side effects — nothing is downloaded
+    until a specific candidate is approved via the endpoint below.
+    """
+    product = products.get(product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return search_manual(product.brand, product.model, product.category)
+
+
+@app.post("/api/products/{product_id}/discover/approve", response_model=ProductDocumentOut)
+def approve_candidate(product_id: str, request: ApproveCandidateRequest):
+    """Download, verify, ingest, and link ONE candidate the user has explicitly
+    approved. Never called automatically — see the standing rule in
+    docs/specs/03-manual-discovery.md.
+    """
+    if products.get(product_id) is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    try:
+        return ingest_candidate(request.url, request.title, product_id, request.document_kind, products)
+    except DiscoveryError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc

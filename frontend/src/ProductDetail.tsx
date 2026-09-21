@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import { BackIcon, EditIcon, LinkIcon, TrashIcon, WrenchIcon } from "./Icons";
+import DiscoverModal from "./DiscoverModal";
+import { BackIcon, EditIcon, LinkIcon, SearchIcon, TrashIcon, WrenchIcon } from "./Icons";
 import LinkDocumentModal from "./LinkDocumentModal";
 import MaintenanceForm from "./MaintenanceForm";
 import ProductForm from "./ProductForm";
@@ -24,6 +25,7 @@ export default function ProductDetail({ product, onBack, onUpdated, onDeleted }:
   const [maintenance, setMaintenance] = useState<MaintenanceEntry[] | null>(null);
   const [editing, setEditing] = useState(false);
   const [linkingDocument, setLinkingDocument] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
   const [addingMaintenance, setAddingMaintenance] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -100,9 +102,14 @@ export default function ProductDetail({ product, onBack, onUpdated, onDeleted }:
       <div className="section">
         <div className="section-header">
           <p className="section-title">Manuals</p>
-          <button className="button" onClick={() => setLinkingDocument(true)}>
-            <LinkIcon size={13} /> Add
-          </button>
+          <div className="button-row">
+            <button className="button" onClick={() => setDiscovering(true)}>
+              <SearchIcon size={13} /> Discover
+            </button>
+            <button className="button" onClick={() => setLinkingDocument(true)}>
+              <LinkIcon size={13} /> Add
+            </button>
+          </div>
         </div>
         {documents === null ? (
           <p className="loading-text">Loading…</p>
@@ -166,6 +173,17 @@ export default function ProductDetail({ product, onBack, onUpdated, onDeleted }:
           onClose={() => setLinkingDocument(false)}
           onLinked={(link) => {
             setLinkingDocument(false);
+            setDocuments((prev) => [...(prev ?? []), link]);
+          }}
+        />
+      )}
+
+      {discovering && (
+        <DiscoverModal
+          productId={product.id}
+          onClose={() => setDiscovering(false)}
+          onLinked={(link) => {
+            setDiscovering(false);
             setDocuments((prev) => [...(prev ?? []), link]);
           }}
         />

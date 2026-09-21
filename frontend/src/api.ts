@@ -1,4 +1,4 @@
-import type { Document, MaintenanceEntry, Product, ProductDocument, ProductInput } from "./types";
+import type { Candidate, Document, MaintenanceEntry, Product, ProductDocument, ProductInput } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -44,5 +44,12 @@ export const api = {
     request<MaintenanceEntry>(`/api/products/${productId}/maintenance`, {
       method: "POST",
       body: JSON.stringify(entry),
+    }),
+
+  discoverManual: (productId: string) => request<Candidate[]>(`/api/products/${productId}/discover`),
+  approveCandidate: (productId: string, candidate: Candidate, kind: string) =>
+    request<ProductDocument>(`/api/products/${productId}/discover/approve`, {
+      method: "POST",
+      body: JSON.stringify({ url: candidate.url, title: candidate.title, document_kind: kind }),
     }),
 };

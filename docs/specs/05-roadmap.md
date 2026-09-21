@@ -15,8 +15,17 @@
 - [x] Phase 1 frontend: product list/detail views, add/edit modal, maintenance log,
   document linking (upload new PDF or link an already-ingested one). Verified live —
   created products, uploaded a manual, added a maintenance entry, all through the UI.
+- [x] Phase 2 — discovery agent: `SearchBackend` interface (Tavily + keyless
+  DuckDuckGo fallback), candidate ranking, approval UI, download→verify→ingest→link.
+  Verified live against the real Tavily API and caught (then fixed) two real ranking
+  problems plus one real safety gap along the way — see
+  [03-manual-discovery.md](03-manual-discovery.md)'s Flow section for the
+  content-relevance check this added: a candidate titled "Roborock S7" resolved to
+  an entirely unrelated PDF (US Sentencing Commission guidelines), which passed the
+  content-type/size checks fine since it genuinely was a large real PDF — the title
+  and source of a search result don't prove what the URL actually resolves to.
 
-**Phase 1 is done.**
+**Phase 1 and Phase 2 are done.**
 
 ## Phase 1 — inventory, no discovery/routing yet
 
@@ -31,11 +40,14 @@
 
 ## Phase 2 — discovery agent
 
-- [ ] `SearchBackend` interface + Tavily implementation + keyless DuckDuckGo HTML
+- [x] `SearchBackend` interface + Tavily implementation + keyless DuckDuckGo HTML
   fallback (auto-selected by `TAVILY_API_KEY` presence — see
   [03-manual-discovery.md](03-manual-discovery.md)), candidate ranking.
-- [ ] Approval UI (show candidates, approve/reject/provide-own-URL).
-- [ ] Download + verify + hand off to `ragapp`'s ingestion functions directly.
+- [x] Approval UI (show candidates with match reasoning, approve one at a time).
+  Provide-own-URL isn't separate — `LinkDocumentModal`'s "Upload PDF" already covers
+  the "nothing good found" case.
+- [x] Download + verify (content-type, size, **and content-relevance** — see
+  03-manual-discovery.md) + hand off to `ragapp`'s ingestion functions directly.
 
 ## Phase 3 — query routing + unified chat
 
