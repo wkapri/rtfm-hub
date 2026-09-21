@@ -1,0 +1,32 @@
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+
+# --- Node / Frontend ---
+node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/tsconfig.tsbuildinfo
+npm-debug.log*
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Data (downloaded manuals stay in rtfm-rag, not duplicated here) ---
+data/postgres/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
