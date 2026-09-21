@@ -12,6 +12,11 @@
 - [x] Phase 1 backend: shared Postgres (hubapp's schema applied after ragapp's own),
   FastAPI CRUD for products + maintenance log, PDF upload → `ingest_pdf()` →
   link-to-product. Verified live end to end (see commit history).
+- [x] Phase 1 frontend: product list/detail views, add/edit modal, maintenance log,
+  document linking (upload new PDF or link an already-ingested one). Verified live —
+  created products, uploaded a manual, added a maintenance entry, all through the UI.
+
+**Phase 1 is done.**
 
 ## Phase 1 — inventory, no discovery/routing yet
 
@@ -22,7 +27,7 @@
   the upload endpoint (`POST /products/{id}/documents/upload`), which calls
   `ingest_pdf()` directly and links the result; a separate `POST .../documents`
   endpoint links an already-ingested `document_id` without re-uploading.
-- [ ] Frontend: product list/detail views, add/edit product, maintenance log entries.
+- [x] Frontend: product list/detail views, add/edit product, maintenance log entries.
 
 ## Phase 2 — discovery agent
 
