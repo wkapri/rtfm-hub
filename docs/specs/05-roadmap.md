@@ -33,7 +33,9 @@ first one:
 
 ## Phase 2 — discovery agent
 
-- [ ] Tavily integration, candidate search + ranking.
+- [ ] `SearchBackend` interface + Tavily implementation + keyless DuckDuckGo HTML
+  fallback (auto-selected by `TAVILY_API_KEY` presence — see
+  [03-manual-discovery.md](03-manual-discovery.md)), candidate ranking.
 - [ ] Approval UI (show candidates, approve/reject/provide-own-URL).
 - [ ] Download + verify + hand off to `ragapp`'s ingestion functions directly.
 

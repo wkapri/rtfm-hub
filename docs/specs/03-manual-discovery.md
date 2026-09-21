@@ -7,6 +7,34 @@ Not a v1 limitation to relax later — this stays true even once ranking is reli
 because a wrong or malicious PDF silently ingested into the RAG store is a bad failure
 mode, and it's cheap to just ask.
 
+## Search backend: Tavily, with a keyless fallback
+
+Tavily is the primary backend (built for LLM/agent use — clean results, often direct
+PDF links). It needs an API key. Rather than making the whole discovery feature
+unusable without one, there's an automatic fallback:
+
+- `TAVILY_API_KEY` set → use Tavily.
+- Not set → use **DuckDuckGo's HTML search endpoint**
+  (`html.duckduckgo.com/html/`) — no API key, no JavaScript rendering needed (a plain
+  HTML response, parseable with a simple request + basic HTML parsing), so no headless
+  browser to bundle.
+
+Explicitly **not** doing real browser automation (Playwright/Selenium driving an
+actual Chromium instance) for this, even as a fallback: it means bundling a full
+browser binary (100s of MB) into what's supposed to be a lightweight, fast-starting
+container — a real cost for a Home Assistant add-on — and directly scraping Google
+is fragile (CAPTCHAs, ToS, markup that changes without notice). DuckDuckGo's HTML
+endpoint is explicitly meant to be machine-parseable and doesn't have those problems.
+
+Both backends implement the same interface — `search(query: str) -> list[RawResult]`
+— so the ranking/candidate logic below doesn't know or care which one ran. Selection
+is automatic (env var presence), not a user-facing setting, mirroring how
+`LLM_PROVIDER` works in rtfm-rag but without the manual choice — this is a fallback,
+not a preference.
+
+Result quality from the fallback will likely be worse than Tavily's (less structured,
+more irrelevant links to filter) — acceptable degradation, not a bug to fix later.
+
 ## Flow
 
 1. Triggered when a product is added (or manually re-triggered from the product page
@@ -14,8 +42,9 @@ mode, and it's cheap to just ask.
 2. Build a search query from the product's brand + model + category, e.g.
    `"Roborock S7 owner's manual filetype:pdf"`. Category helps disambiguate generic
    model numbers.
-3. Call Tavily's search API. Filter results to plausible PDF links (either the URL
-   ends in `.pdf`, or the result is on a domain that looks like the manufacturer's).
+3. Call the active search backend (Tavily or the DuckDuckGo fallback). Filter results
+   to plausible PDF links (either the URL ends in `.pdf`, or the result is on a
+   domain that looks like the manufacturer's).
 4. Rank candidates — cheap heuristics, no LLM call needed for this part:
    - Manufacturer's own domain (or a known aggregator like manualslib.com) ranks
      above random third-party sites.
@@ -29,8 +58,9 @@ mode, and it's cheap to just ask.
 6. User approves one (or rejects all — no manual found, log it as such rather than
    silently failing).
 7. On approval: download the file, verify `Content-Type` is actually a PDF and the
-   size is sane (reject 0-byte or suspiciously huge files), then call rtfm-rag's
-   `POST /api/documents` to ingest it.
+   size is sane (reject 0-byte or suspiciously huge files), then call `ragapp`'s
+   `ingest_pdf()` directly (in-process library call, not an HTTP request — see
+   [01-architecture.md](01-architecture.md)).
 8. Store the resulting `document_id` in `product_documents`.
 
 ## What happens when nothing good is found
@@ -45,5 +75,8 @@ inventory without a manual; that's a valid state, not an error state.
 - Re-checking for a newer manual revision later (recalls, firmware updates that change
   the manual) — out of scope until there's a reason to need it.
 - Scraping manufacturer support sites directly instead of general web search — only
-  worth the per-brand engineering effort if Tavily's results prove unreliable for
+  worth the per-brand engineering effort if both search backends prove unreliable for
   specific brands in practice.
+- A third, browser-automation-backed search tier — only worth the weight/fragility
+  tradeoff if the DuckDuckGo fallback proves genuinely inadequate in practice, not
+  speculatively.

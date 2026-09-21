@@ -63,8 +63,10 @@ CLI-only. Both are tracked in rtfm-rag's own roadmap.
 1. User adds a product (nickname, brand, model, category) via the frontend, or (HA
    add-on mode only) picks one from an auto-imported list of HA devices.
 2. `POST /api/products` creates the row.
-3. Discovery: backend calls Tavily, ranks candidates, returns them to the frontend for
-   approval (see [03-manual-discovery.md](03-manual-discovery.md)).
+3. Discovery: backend calls the active search backend (Tavily, or a keyless
+   DuckDuckGo fallback if no `TAVILY_API_KEY` is set), ranks candidates, returns them
+   to the frontend for approval (see
+   [03-manual-discovery.md](03-manual-discovery.md)).
 4. On approval: backend downloads the PDF, verifies it, and calls `ragapp`'s ingestion
    functions directly (in-process — no HTTP call) to chunk/embed/store it.
 5. The resulting `document_id` (rtfm-rag's own UUID) is stored in
@@ -111,8 +113,8 @@ architecture now specifically so this doesn't require a rewrite later.
 
 ## Key interfaces
 
-- `DiscoveryAgent.search(brand, model) -> list[Candidate]` — Tavily search + ranking,
-  no side effects.
+- `DiscoveryAgent.search(brand, model) -> list[Candidate]` — search (via whichever
+  `SearchBackend` is active) + ranking, no side effects.
 - `DiscoveryAgent.ingest(candidate, product_id) -> document_id` — the only place that
   downloads a file, only ever called after explicit approval of that candidate. Calls
   `ragapp`'s ingestion functions directly.

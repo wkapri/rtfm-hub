@@ -42,7 +42,7 @@ through its FastAPI routes. Tracked as work items in rtfm-rag's own roadmap.
 | Backend        | Python (FastAPI)                            | products/inventory API, discovery agent, query router, imports rtfm-rag's `ragapp` package directly |
 | Frontend       | React + TypeScript (Vite)                   | inventory UI + chat UI |
 | Database       | PostgreSQL                                  | one shared database with rtfm-rag's tables (real FKs) — see 01-architecture.md |
-| Web search     | Tavily API                                  | manual discovery — needs an API key (free tier: 1000 searches/mo) |
+| Web search     | Tavily API, with an automatic keyless fallback (DuckDuckGo HTML search) if `TAVILY_API_KEY` isn't set | manual discovery — see 03-manual-discovery.md for why the fallback isn't browser automation |
 | LLM            | Pluggable provider (Ollama by default; OpenAI-compatible / Anthropic later) | shared abstraction, lives in `ragapp.llm`, used by both RAG generation and query routing |
 
 ## Deployment targets
@@ -65,7 +65,7 @@ rtfm-hub/
   backend/
     src/hubapp/
       products/        Inventory CRUD, maintenance log
-      discovery/        Tavily search, candidate ranking, download+handoff to rtfm-rag's ingestion
+      discovery/        Search backends (Tavily + keyless DuckDuckGo fallback), candidate ranking, download+handoff to ragapp's ingestion
       routing/          Intent classification (manual vs. inventory question), product inference
       ha/               HA-add-on-only: device-registry import (SUPERVISOR_TOKEN-gated)
       api/              FastAPI app
@@ -93,5 +93,7 @@ Design phase — docs/specs/ only, no code yet. See
 
 ## Prerequisites
 
-Same machine as rtfm-rag — Python, Node, Docker, Ollama are already installed. New for
-this project: a [Tavily](https://tavily.com) API key (free tier).
+Same machine as rtfm-rag — Python, Node, Docker, Ollama are already installed.
+Optional for this project: a [Tavily](https://tavily.com) API key (free tier) for
+better manual-discovery search results — works without one (falls back to a keyless
+DuckDuckGo search, see 03-manual-discovery.md), just with weaker ranking.

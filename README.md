@@ -19,8 +19,12 @@ rtfm-rag integration point get proven out before adding the harder pieces.
 ## Prerequisites
 
 Same machine as rtfm-rag — Python, Node, Docker, and Ollama are already installed
-(see [rtfm-rag's README](../rtfm-rag/README.md) if starting fresh elsewhere). New for
-this project: a [Tavily](https://tavily.com) API key (free tier is enough to start).
+(see [rtfm-rag's README](../rtfm-rag/README.md) if starting fresh elsewhere). Optional:
+a [Tavily](https://tavily.com) API key for better manual-discovery search results —
+works without one, see [03-manual-discovery.md](docs/specs/03-manual-discovery.md).
 
-rtfm-rag itself needs to be running (`docker compose up -d` + backend + frontend in
-that repo) since rtfm-hub calls its API rather than duplicating retrieval.
+rtfm-hub imports rtfm-rag's `ragapp` package directly rather than calling it over
+HTTP, so **rtfm-rag's own Docker Compose/backend/frontend don't need to be running**
+— rtfm-hub has its own Postgres (shared schema with `ragapp`'s tables) and calls
+`ragapp`'s Python functions in-process. You do need `ragapp` installed as an editable
+package in this project's venv, though — see setup below.
