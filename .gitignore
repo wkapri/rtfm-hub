@@ -22,8 +22,9 @@ npm-debug.log*
 .env.*
 !.env.example
 
-# --- Data (downloaded manuals stay in rtfm-rag, not duplicated here) ---
+# --- Data ---
 data/postgres/
+backend/data/manuals/
 
 # --- OS / editor ---
 .DS_Store

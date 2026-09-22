@@ -166,6 +166,7 @@ button {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
+  text-decoration: none;
   transition: background 0.15s, border-color 0.15s, opacity 0.15s;
 }
 

@@ -11,6 +11,7 @@ from hubapp.discovery.ranking import Candidate, rank_candidates
 from hubapp.models import ProductDocument
 from hubapp.observability import Trace
 from hubapp.products.store import ProductStore
+from hubapp.storage import save_manual
 
 _USER_AGENT = "Mozilla/5.0 (compatible; rtfm-hub/0.1; +https://github.com/wkapri/rtfm-hub)"
 _MIN_PDF_BYTES = 1024  # reject suspiciously tiny "PDFs" (broken links, error pages)
@@ -114,6 +115,8 @@ def ingest_candidate(
             except IngestionError as exc:
                 s.detail = f"failed: {exc}"
                 raise DiscoveryError(str(exc)) from exc
+
+        save_manual(document_id, response.content)
 
     return products.link_document(product_id, document_id, document_kind, source_url=candidate_url)
 

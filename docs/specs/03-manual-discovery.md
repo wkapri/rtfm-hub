@@ -43,9 +43,16 @@ more irrelevant links to filter) — acceptable degradation, not a bug to fix la
    `"Roborock S7 owner's manual filetype:pdf"`. Category helps disambiguate generic
    model numbers.
 3. Call the active search backend (Tavily or the DuckDuckGo fallback). Filter results
-   to plausible PDF links (either the URL ends in `.pdf`, or the result is on a
-   domain that looks like the manufacturer's).
-4. Rank candidates — cheap heuristics, no LLM call needed for this part:
+   to plausible candidates: the manufacturer's own domain, a known aggregator
+   (manualslib.com etc.), or a direct `.pdf` link that actually mentions the
+   product's brand or model somewhere in its title/URL. That last clause matters —
+   being a `.pdf` link is *not* enough on its own. Found via live testing: searching
+   for a Subaru's manual returned completely unrelated PDFs (a solar-charger
+   manual, a state DMV handbook) that used to pass this filter purely because the
+   URL ended in `.pdf`, with no check that they had anything to do with the
+   product. If nothing plausible survives the filter, that's an honest empty
+   result — see "What happens when nothing good is found" below.
+4. Rank the survivors — cheap heuristics, no LLM call needed for this part:
    - A direct `.pdf` link outranks everything else, including an aggregator match —
      an aggregator "manual" page (e.g. ManualsLib) is often an HTML viewer, not a
      download, and fails step 7's PDF check; a real PDF link just works. Found via
@@ -62,7 +69,9 @@ more irrelevant links to filter) — acceptable degradation, not a bug to fix la
      see and pick the others.
 5. Return top 3 candidates to the frontend: title, source URL, domain, and which
    heuristics matched (so the user can judge confidence themselves, not just trust a
-   score).
+   score). Each candidate also links directly to its source URL ("Preview") so the
+   user can open and look at the actual page/file before approving anything — not
+   just trust the title.
 6. User approves one (or rejects all — no manual found, log it as such rather than
    silently failing).
 7. On approval: download the file, verify `Content-Type` is actually a PDF and the
@@ -75,10 +84,21 @@ more irrelevant links to filter) — acceptable degradation, not a bug to fix la
    it genuinely was a large, real PDF. The title and source of a search result are
    not proof of what a URL actually resolves to. If the check fails, surface a clear
    error and let the user try another candidate — same "no auto-selection" principle
-   as everywhere else in this flow.
+   as everywhere else in this flow. Note this check accepts brand *or* model, so a
+   manual for a different model from the same brand can still pass it — filtering
+   already keeps most of these out at step 3, but it's not a full model-match
+   guarantee, which is what the "Preview" link is for.
 8. If all checks pass, call `ragapp`'s `ingest_pdf()` directly (in-process library
    call, not an HTTP request — see [01-architecture.md](01-architecture.md)) and
-   store the resulting `document_id` in `product_documents`.
+   store the resulting `document_id` in `product_documents`. The original PDF bytes
+   are also saved to `MANUALS_DIR` (`hubapp/storage.py`), keyed by `document_id` —
+   ingestion only stores extracted text/chunks/embeddings, so without this the
+   source file would be discarded once the temp directory it was downloaded into is
+   cleaned up. `GET /api/documents/{document_id}/file` serves it back, and every
+   linked manual in the product detail view has a "View" link to it. Documents
+   ingested before this feature existed (or a manually-uploaded PDF from before the
+   upload endpoint also started retaining copies) 404 on this endpoint — there's no
+   file to serve for those.
 
 ## What happens when nothing good is found
 

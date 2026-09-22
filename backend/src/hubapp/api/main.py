@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict
 from ragapp.ingestion.service import IngestionError, ingest_pdf
 from ragapp.retrieval.store import VectorStore
@@ -15,6 +16,7 @@ from hubapp.discovery.identify import IdentifyError, identify_product
 from hubapp.discovery.service import DiscoveryError, ingest_candidate, search_manual
 from hubapp.observability import Trace
 from hubapp.products.store import ProductStore
+from hubapp.storage import manual_path, save_manual
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s: %(message)s")
 
@@ -250,15 +252,30 @@ async def upload_and_link_document(
     if products.get(product_id) is None:
         raise HTTPException(status_code=404, detail="Product not found")
 
+    content = await file.read()
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir) / (file.filename or "manual.pdf")
-        tmp_path.write_bytes(await file.read())
+        tmp_path.write_bytes(content)
         try:
             document_id, _chunk_count = ingest_pdf(tmp_path, title=file.filename)
         except IngestionError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    save_manual(document_id, content)
     return products.link_document(product_id, document_id, document_kind)
+
+
+@app.get("/api/documents/{document_id}/file")
+def get_document_file(document_id: str):
+    """Serve the retained copy of an ingested manual's original PDF — for
+    viewing/downloading after linking, and for verifying a discovery candidate
+    before approving it. Returns 404 for documents ingested before manual
+    retention existed, or if the file was otherwise never saved.
+    """
+    path = manual_path(document_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="No retained file for this document.")
+    return FileResponse(path, media_type="application/pdf")
 
 
 @app.get("/api/products/{product_id}/maintenance", response_model=list[MaintenanceOut])

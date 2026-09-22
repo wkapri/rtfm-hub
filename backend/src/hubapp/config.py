@@ -11,5 +11,9 @@ class Settings(BaseSettings):
 
     tavily_api_key: str | None = None
 
+    # Where retained copies of ingested manuals live (so they can be viewed/
+    # downloaded later, not just chunked into the vector store and discarded).
+    manuals_dir: str = "data/manuals"
+
 
 settings = Settings()

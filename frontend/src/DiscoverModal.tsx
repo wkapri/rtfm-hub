@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import { CheckIcon, CloseIcon } from "./Icons";
+import { CheckIcon, CloseIcon, ExternalLinkIcon } from "./Icons";
 import TracePanel from "./TracePanel";
 import type { Candidate, ProductDocument, TraceStep } from "./types";
 
@@ -80,19 +80,30 @@ export default function DiscoverModal({ productId, onClose, onLinked }: Props) {
                     ))}
                   </div>
                 </div>
-                <button
-                  className="button primary"
-                  onClick={() => handleApprove(c)}
-                  disabled={approvingUrl !== null}
-                >
-                  {approvingUrl === c.url ? (
-                    "Ingesting…"
-                  ) : (
-                    <>
-                      <CheckIcon size={13} /> Use this
-                    </>
-                  )}
-                </button>
+                <div className="button-row" style={{ flexShrink: 0 }}>
+                  <a
+                    className="button"
+                    href={c.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Open the source PDF to verify it's the right one before approving"
+                  >
+                    <ExternalLinkIcon size={13} /> Preview
+                  </a>
+                  <button
+                    className="button primary"
+                    onClick={() => handleApprove(c)}
+                    disabled={approvingUrl !== null}
+                  >
+                    {approvingUrl === c.url ? (
+                      "Ingesting…"
+                    ) : (
+                      <>
+                        <CheckIcon size={13} /> Use this
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             ))}
           </div>

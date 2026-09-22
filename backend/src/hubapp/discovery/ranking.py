@@ -27,7 +27,7 @@ def rank_candidates(
     candidates = []
     for r in results:
         domain = urlparse(r.url).netloc.lower().removeprefix("www.")
-        if not _is_plausible(r.url, domain, brand):
+        if not _is_plausible(r, domain, brand, model):
             continue
         candidates.append(_score(r, domain, brand, model))
 
@@ -35,12 +35,31 @@ def rank_candidates(
     return candidates
 
 
-def _is_plausible(url: str, domain: str, brand: str | None) -> bool:
-    if urlparse(url).path.lower().endswith(".pdf"):
-        return True
+def _is_plausible(result: SearchResult, domain: str, brand: str | None, model: str | None) -> bool:
+    """A candidate is only worth ranking/showing if there's SOME actual signal
+    tying it to this product — being a .pdf link alone isn't that signal (any
+    unrelated PDF on the web ends in .pdf too). Found via live testing: a search
+    for a Subaru's manual returned completely unrelated PDFs (a solar-charger
+    manual, a state DMV handbook) that used to sail through here purely because
+    the URL ended in ".pdf", then picked up "direct PDF link" + "looks like an
+    owner's manual" score bonuses despite having nothing to do with the product.
+    """
     if brand and brand.lower() in domain:
         return True
-    return domain in MANUAL_AGGREGATOR_DOMAINS
+    if domain in MANUAL_AGGREGATOR_DOMAINS:
+        return True
+    is_pdf = urlparse(result.url).path.lower().endswith(".pdf")
+    if not brand and not model:
+        # Nothing to check relevance against (product has neither set) — fall
+        # back to the old permissive behavior rather than filtering everything.
+        return is_pdf
+    if is_pdf:
+        haystack = f"{result.title} {result.url}".lower()
+        if brand and brand.lower() in haystack:
+            return True
+        if model and model.lower() in haystack:
+            return True
+    return False
 
 
 def _score(result: SearchResult, domain: str, brand: str | None, model: str | None) -> Candidate:

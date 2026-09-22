@@ -2,11 +2,10 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 import { categoryIcon } from "./categoryIcon";
 import DiscoverModal from "./DiscoverModal";
-import { BackIcon, EditIcon, LinkIcon, SearchIcon, TrashIcon, WrenchIcon } from "./Icons";
+import { BackIcon, EditIcon, ExternalLinkIcon, LinkIcon, SearchIcon, TrashIcon } from "./Icons";
 import LinkDocumentModal from "./LinkDocumentModal";
-import MaintenanceForm from "./MaintenanceForm";
 import ProductForm from "./ProductForm";
-import type { MaintenanceEntry, Product, ProductDocument } from "./types";
+import type { Product, ProductDocument } from "./types";
 
 interface Props {
   product: Product;
@@ -29,16 +28,13 @@ const KIND_LABELS: Record<string, string> = {
 
 export default function ProductDetail({ product, onBack, onUpdated, onDeleted, autoDiscover }: Props) {
   const [documents, setDocuments] = useState<ProductDocument[] | null>(null);
-  const [maintenance, setMaintenance] = useState<MaintenanceEntry[] | null>(null);
   const [editing, setEditing] = useState(false);
   const [linkingDocument, setLinkingDocument] = useState(false);
   const [discovering, setDiscovering] = useState(autoDiscover ?? false);
-  const [addingMaintenance, setAddingMaintenance] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     api.listProductDocuments(product.id).then(setDocuments).catch(() => setDocuments([]));
-    api.listMaintenance(product.id).then(setMaintenance).catch(() => setMaintenance([]));
   }, [product.id]);
 
   async function handleDelete() {
@@ -135,32 +131,14 @@ export default function ProductDetail({ product, onBack, onUpdated, onDeleted, a
                   <p className="item-row-title">{KIND_LABELS[d.document_kind] ?? d.document_kind}</p>
                   <p className="item-row-meta">Added {new Date(d.added_at).toLocaleDateString()}</p>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="section">
-        <div className="section-header">
-          <p className="section-title">Maintenance log</p>
-          <button className="button" onClick={() => setAddingMaintenance(true)}>
-            <WrenchIcon size={13} /> Add
-          </button>
-        </div>
-        {maintenance === null ? (
-          <p className="loading-text">Loading…</p>
-        ) : maintenance.length === 0 ? (
-          <p className="empty-hint">No maintenance entries yet.</p>
-        ) : (
-          <div className="item-list">
-            {maintenance.map((m) => (
-              <div className="item-row" key={m.id}>
-                <div className="item-row-main">
-                  <p className="item-row-title">{m.description}</p>
-                  <p className="item-row-meta">{m.date}</p>
-                </div>
-                {m.cost && <span className="badge">${m.cost}</span>}
+                <a
+                  className="button"
+                  href={`/api/documents/${d.document_id}/file`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLinkIcon size={13} /> View
+                </a>
               </div>
             ))}
           </div>
@@ -201,16 +179,6 @@ export default function ProductDetail({ product, onBack, onUpdated, onDeleted, a
         />
       )}
 
-      {addingMaintenance && (
-        <MaintenanceForm
-          productId={product.id}
-          onClose={() => setAddingMaintenance(false)}
-          onSaved={(entry) => {
-            setAddingMaintenance(false);
-            setMaintenance((prev) => [entry, ...(prev ?? [])]);
-          }}
-        />
-      )}
     </div>
   );
 }

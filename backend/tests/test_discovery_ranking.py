@@ -80,6 +80,30 @@ def test_right_model_beats_wrong_model_even_on_better_domain():
     assert candidates[0].url.endswith("s7.pdf")
 
 
+def test_unrelated_pdf_with_no_brand_or_model_mention_is_filtered_out():
+    # Real bug found via live testing: searching for a "Subaru XV Crosstrek"
+    # manual returned completely unrelated PDFs (a solar-charger manual, a
+    # state DMV handbook) that used to pass the filter purely because the URL
+    # ended in ".pdf", with no check that they had anything to do with the
+    # product at all.
+    results = [
+        SearchResult(
+            title="Manual - SmartShunt IP65",
+            url="https://www.victronenergy.com/upload/documents/smartshunt-manual.pdf",
+            snippet="", source="tavily",
+        ),
+        SearchResult(
+            title="Subaru XV Crosstrek Owner's Manual",
+            url="https://cdn.example.com/files/xv-crosstrek.pdf",
+            snippet="", source="tavily",
+        ),
+    ]
+    candidates = rank_candidates(results, brand="Subaru", model="XV Crosstrek")
+
+    assert len(candidates) == 1
+    assert candidates[0].url.endswith("xv-crosstrek.pdf")
+
+
 def test_direct_pdf_link_outranks_aggregator_viewer_page():
     # Real-world case: ManualsLib's individual pages rank well but are HTML
     # viewers, not downloadable PDFs — a direct .pdf link should win even though
