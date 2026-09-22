@@ -2,14 +2,15 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 import { PlusIcon } from "./Icons";
 import ProductDetail from "./ProductDetail";
-import ProductForm from "./ProductForm";
 import ProductList from "./ProductList";
+import QuickAddModal from "./QuickAddModal";
 import type { Product } from "./types";
 
 export default function App() {
   const [products, setProducts] = useState<Product[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [autoDiscoverId, setAutoDiscoverId] = useState<string | null>(null);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export default function App() {
           <h1 className="header-title">rtfm-hub</h1>
         </div>
         {!selected && (
-          <button className="icon-button primary" onClick={() => setShowForm(true)} aria-label="Add product">
+          <button className="icon-button primary" onClick={() => setShowQuickAdd(true)} aria-label="Add product">
             <PlusIcon />
           </button>
         )}
@@ -45,27 +46,39 @@ export default function App() {
       ) : selected ? (
         <ProductDetail
           product={selected}
-          onBack={() => setSelectedId(null)}
+          autoDiscover={autoDiscoverId === selected.id}
+          onBack={() => {
+            setSelectedId(null);
+            setAutoDiscoverId(null);
+          }}
           onUpdated={(updated) => {
             setProducts((prev) => (prev ?? []).map((p) => (p.id === updated.id ? updated : p)));
           }}
           onDeleted={(id) => {
             setProducts((prev) => (prev ?? []).filter((p) => p.id !== id));
             setSelectedId(null);
+            setAutoDiscoverId(null);
           }}
         />
       ) : (
-        <ProductList products={products} onSelect={(p) => setSelectedId(p.id)} onAdd={() => setShowForm(true)} />
+        <ProductList
+          products={products}
+          onSelect={(p) => {
+            setSelectedId(p.id);
+            setAutoDiscoverId(null);
+          }}
+          onAdd={() => setShowQuickAdd(true)}
+        />
       )}
 
-      {showForm && (
-        <ProductForm
-          product={null}
-          onClose={() => setShowForm(false)}
+      {showQuickAdd && (
+        <QuickAddModal
+          onClose={() => setShowQuickAdd(false)}
           onSaved={(created) => {
-            setShowForm(false);
+            setShowQuickAdd(false);
             setProducts((prev) => [...(prev ?? []), created]);
             setSelectedId(created.id);
+            setAutoDiscoverId(created.id);
           }}
         />
       )}

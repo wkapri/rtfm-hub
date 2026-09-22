@@ -24,6 +24,18 @@
   an entirely unrelated PDF (US Sentencing Commission guidelines), which passed the
   content-type/size checks fine since it genuinely was a large real PDF — the title
   and source of a search result don't prove what the URL actually resolves to.
+- [x] Smart "Add product": replaced the blank product form with a single
+  description field — the discovery agent searches the web, has the LLM extract
+  brand/model/category/year from real results, and the user confirms/edits before
+  saving. Discovery auto-runs right after a product is created this way. Required
+  extending rtfm-rag's `LLMProvider.chat_stream()` with an optional `system_prompt`
+  override (it was hardcoded to the RAG manual-Q&A prompt) — see
+  [03-manual-discovery.md](03-manual-discovery.md) for the identify flow and the
+  context-window truncation bug this surfaced.
+- [x] Observability: every identify/discover/ingest request now records a step-by-step
+  trace (which search backend ran, what it found, verification results, timings),
+  logged server-side and shown in the UI as a collapsible "What happened" panel —
+  see [03-manual-discovery.md](03-manual-discovery.md).
 
 **Phase 1 and Phase 2 are done.**
 

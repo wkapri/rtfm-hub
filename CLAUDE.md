@@ -98,7 +98,13 @@ link-to-product, plus a full React frontend for all of it. The discovery agent
 (`hubapp/discovery/`) is live against the real Tavily API — search, ranking, an
 approval UI, and a content-relevance check added after live testing surfaced a real
 failure (a search result whose title didn't match what its URL actually resolved
-to; see 03-manual-discovery.md). No query routing/chat yet. See
+to; see 03-manual-discovery.md). Adding a product now starts from a single
+free-text description instead of a blank form — the discovery agent's search
+backend plus an LLM extraction step identify brand/model/category/year for the
+user to confirm/edit, then discovery auto-runs on save (see 03-manual-discovery.md's
+"Product identification" section). Every identify/discover/approve request is
+traced (steps + timings), logged server-side and shown in the UI as a "What
+happened" panel (`hubapp/observability.py`). No query routing/chat yet. See
 [docs/specs/05-roadmap.md](docs/specs/05-roadmap.md).
 
 ## Prerequisites

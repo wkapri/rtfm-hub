@@ -9,6 +9,7 @@ from ragapp.ingestion.service import IngestionError, ingest_pdf
 from hubapp.discovery.factory import create_search_backend
 from hubapp.discovery.ranking import Candidate, rank_candidates
 from hubapp.models import ProductDocument
+from hubapp.observability import Trace
 from hubapp.products.store import ProductStore
 
 _USER_AGENT = "Mozilla/5.0 (compatible; rtfm-hub/0.1; +https://github.com/wkapri/rtfm-hub)"
@@ -21,15 +22,28 @@ class DiscoveryError(Exception):
 
 
 def search_manual(
-    brand: str | None, model: str | None, category: str | None, max_results: int = 3
+    brand: str | None,
+    model: str | None,
+    category: str | None,
+    max_results: int = 3,
+    trace: Trace | None = None,
 ) -> list[Candidate]:
     """Search + rank only — no downloads, no side effects. Safe to call as often
     as the user wants without the approval rule coming into play.
     """
+    trace = trace if trace is not None else Trace()
     query = " ".join(p for p in (brand, model, category) if p) + " owner's manual filetype:pdf"
     backend = create_search_backend()
-    results = backend.search(query, max_results=10)
-    return rank_candidates(results, brand, model)[:max_results]
+
+    with trace.step("web_search") as s:
+        results = backend.search(query, max_results=10)
+        s.detail = f"{type(backend).__name__}: {len(results)} result(s) for {query!r}"
+
+    with trace.step("rank_candidates") as s:
+        ranked = rank_candidates(results, brand, model)[:max_results]
+        s.detail = f"{len(ranked)} candidate(s) kept: " + ", ".join(c.domain for c in ranked)
+
+    return ranked
 
 
 def ingest_candidate(
@@ -38,6 +52,7 @@ def ingest_candidate(
     product_id: str,
     document_kind: str,
     products: ProductStore,
+    trace: Trace | None = None,
 ) -> ProductDocument:
     """Download, verify, ingest, and link ONE specific candidate. Only ever called
     after the user has approved that exact candidate — see the standing rule in
@@ -54,40 +69,51 @@ def ingest_candidate(
     the product's brand or model appear anywhere in the first few pages — before
     committing to a full ingest.
     """
+    trace = trace if trace is not None else Trace()
     product = products.get(product_id)
 
-    with httpx.Client(timeout=30, follow_redirects=True, headers={"User-Agent": _USER_AGENT}) as client:
-        try:
-            response = client.get(candidate_url)
-            response.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise DiscoveryError(f"Couldn't download that URL: {exc}") from exc
+    with trace.step("download") as s:
+        with httpx.Client(timeout=30, follow_redirects=True, headers={"User-Agent": _USER_AGENT}) as client:
+            try:
+                response = client.get(candidate_url)
+                response.raise_for_status()
+            except httpx.HTTPError as exc:
+                s.detail = f"failed: {exc}"
+                raise DiscoveryError(f"Couldn't download that URL: {exc}") from exc
 
-    content_type = response.headers.get("content-type", "").lower()
-    if "pdf" not in content_type and not candidate_url.lower().endswith(".pdf"):
-        raise DiscoveryError(f"That link doesn't look like a PDF (content-type: {content_type or 'unknown'}).")
-    if len(response.content) < _MIN_PDF_BYTES:
-        raise DiscoveryError("Downloaded file is suspiciously small — probably not a real manual.")
+        content_type = response.headers.get("content-type", "").lower()
+        s.detail = f"{len(response.content)} bytes, content-type={content_type or 'unknown'}"
+
+        if "pdf" not in content_type and not candidate_url.lower().endswith(".pdf"):
+            raise DiscoveryError(f"That link doesn't look like a PDF (content-type: {content_type or 'unknown'}).")
+        if len(response.content) < _MIN_PDF_BYTES:
+            raise DiscoveryError("Downloaded file is suspiciously small — probably not a real manual.")
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir) / f"{_safe_filename(candidate_title)}.pdf"
         tmp_path.write_bytes(response.content)
 
         if product and (product.brand or product.model):
-            preview_text = _extract_preview_text(tmp_path)
-            if not _mentions_product(preview_text, product.brand, product.model):
+            with trace.step("content_relevance_check") as s:
+                preview_text = _extract_preview_text(tmp_path)
+                mentioned = _mentions_product(preview_text, product.brand, product.model)
                 wanted = " ".join(p for p in (product.brand, product.model) if p)
-                raise DiscoveryError(
-                    f'This PDF doesn\'t mention "{wanted}" anywhere in its first '
-                    f"{_RELEVANCE_CHECK_PAGES} pages — probably the wrong document "
-                    "(the title/source can be misleading). Try another candidate, or "
-                    "link/upload the correct one directly."
-                )
+                s.detail = f'"{wanted}" {"found" if mentioned else "NOT found"} in first {_RELEVANCE_CHECK_PAGES} pages'
+                if not mentioned:
+                    raise DiscoveryError(
+                        f'This PDF doesn\'t mention "{wanted}" anywhere in its first '
+                        f"{_RELEVANCE_CHECK_PAGES} pages — probably the wrong document "
+                        "(the title/source can be misleading). Try another candidate, or "
+                        "link/upload the correct one directly."
+                    )
 
-        try:
-            document_id, _chunk_count = ingest_pdf(tmp_path, title=candidate_title)
-        except IngestionError as exc:
-            raise DiscoveryError(str(exc)) from exc
+        with trace.step("ingest") as s:
+            try:
+                document_id, chunk_count = ingest_pdf(tmp_path, title=candidate_title)
+                s.detail = f"{chunk_count} chunk(s) embedded"
+            except IngestionError as exc:
+                s.detail = f"failed: {exc}"
+                raise DiscoveryError(str(exc)) from exc
 
     return products.link_document(product_id, document_id, document_kind, source_url=candidate_url)
 

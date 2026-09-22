@@ -127,26 +127,8 @@ export default function ProductForm({ product, onClose, onSaved }: Props) {
             </div>
           </div>
 
-          <div className="form-row">
-            <div className="form-field">
-              <label htmlFor="purchase_date">Purchase date</label>
-              <input
-                id="purchase_date"
-                type="date"
-                value={values.purchase_date ?? ""}
-                onChange={(e) => set("purchase_date", e.target.value || null)}
-              />
-            </div>
-            <div className="form-field">
-              <label htmlFor="warranty_expires">Warranty expires</label>
-              <input
-                id="warranty_expires"
-                type="date"
-                value={values.warranty_expires ?? ""}
-                onChange={(e) => set("warranty_expires", e.target.value || null)}
-              />
-            </div>
-          </div>
+          {/* purchase_date / warranty_expires hidden for now — not removed from
+              the data model, just not editable via this form yet. */}
 
           <div className="form-field">
             <label htmlFor="notes">Notes</label>

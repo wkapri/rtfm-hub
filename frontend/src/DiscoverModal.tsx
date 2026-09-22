@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
 import { CheckIcon, CloseIcon } from "./Icons";
-import type { Candidate, ProductDocument } from "./types";
+import TracePanel from "./TracePanel";
+import type { Candidate, ProductDocument, TraceStep } from "./types";
 
 interface Props {
   productId: string;
@@ -11,6 +12,7 @@ interface Props {
 
 export default function DiscoverModal({ productId, onClose, onLinked }: Props) {
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
+  const [searchTrace, setSearchTrace] = useState<TraceStep[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [approvingUrl, setApprovingUrl] = useState<string | null>(null);
   const [approveError, setApproveError] = useState<string | null>(null);
@@ -18,7 +20,10 @@ export default function DiscoverModal({ productId, onClose, onLinked }: Props) {
   useEffect(() => {
     api
       .discoverManual(productId)
-      .then(setCandidates)
+      .then((result) => {
+        setCandidates(result.candidates);
+        setSearchTrace(result.trace);
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "Search failed."));
   }, [productId]);
 
@@ -26,8 +31,8 @@ export default function DiscoverModal({ productId, onClose, onLinked }: Props) {
     setApprovingUrl(candidate.url);
     setApproveError(null);
     try {
-      const link = await api.approveCandidate(productId, candidate, "owners_manual");
-      onLinked(link);
+      const result = await api.approveCandidate(productId, candidate, "owners_manual");
+      onLinked(result.document);
     } catch (err) {
       setApproveError(err instanceof Error ? err.message : "Couldn't ingest that one.");
     } finally {
@@ -48,6 +53,8 @@ export default function DiscoverModal({ productId, onClose, onLinked }: Props) {
         {error && <p className="form-error">{error}</p>}
 
         {candidates === null && !error && <p className="loading-text">Searching…</p>}
+
+        {candidates !== null && <TracePanel steps={searchTrace} />}
 
         {candidates !== null && candidates.length === 0 && (
           <p className="empty-hint">

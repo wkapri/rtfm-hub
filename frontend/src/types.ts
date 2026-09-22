@@ -46,6 +46,32 @@ export interface Candidate {
   match_reasons: string[];
 }
 
+export interface TraceStep {
+  name: string;
+  detail: string;
+  duration_ms: number;
+}
+
+export interface Identification {
+  brand: string | null;
+  model: string | null;
+  category: string | null;
+  year: number | null;
+  confidence: "high" | "medium" | "low";
+  reasoning: string;
+  trace: TraceStep[];
+}
+
+export interface DiscoverResult {
+  candidates: Candidate[];
+  trace: TraceStep[];
+}
+
+export interface ApproveResult {
+  document: ProductDocument;
+  trace: TraceStep[];
+}
+
 export interface MaintenanceEntry {
   id: string;
   product_id: string;

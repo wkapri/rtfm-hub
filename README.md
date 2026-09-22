@@ -17,7 +17,11 @@ a full React frontend for all of it. The discovery agent (Tavily + keyless
 DuckDuckGo fallback, candidate ranking, an approval UI) is live — see
 [03-manual-discovery.md](docs/specs/03-manual-discovery.md) for a real failure it
 caught during testing (a search result whose title didn't match what its URL
-actually resolved to) and the content-relevance check added because of it. No query
+actually resolved to) and the content-relevance check added because of it. Adding a
+product starts from a single description field now — an LLM identifies
+brand/model/category/year from live web search results for you to confirm, then
+discovery auto-runs on save. Every identify/discover/approve request is traced
+(steps + timings) and shown in the UI as a "What happened" panel. No query
 routing/chat yet — see [docs/specs/05-roadmap.md](docs/specs/05-roadmap.md) for
 what's next.
 

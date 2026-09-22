@@ -13,6 +13,12 @@ interface Props {
   onBack: () => void;
   onUpdated: (product: Product) => void;
   onDeleted: (productId: string) => void;
+  // Opens the Discover modal immediately on mount — used right after Quick Add
+  // creates a product, per the "auto-run discovery" flow. Only consulted as
+  // useState's initial value (a one-shot trigger, not a controlled prop): see
+  // App.tsx for why that's safe here (ProductDetail always remounts fresh when
+  // navigating to a different product, since the list view sits between them).
+  autoDiscover?: boolean;
 }
 
 const KIND_LABELS: Record<string, string> = {
@@ -21,12 +27,12 @@ const KIND_LABELS: Record<string, string> = {
   service_manual: "Service manual",
 };
 
-export default function ProductDetail({ product, onBack, onUpdated, onDeleted }: Props) {
+export default function ProductDetail({ product, onBack, onUpdated, onDeleted, autoDiscover }: Props) {
   const [documents, setDocuments] = useState<ProductDocument[] | null>(null);
   const [maintenance, setMaintenance] = useState<MaintenanceEntry[] | null>(null);
   const [editing, setEditing] = useState(false);
   const [linkingDocument, setLinkingDocument] = useState(false);
-  const [discovering, setDiscovering] = useState(false);
+  const [discovering, setDiscovering] = useState(autoDiscover ?? false);
   const [addingMaintenance, setAddingMaintenance] = useState(false);
   const [deleting, setDeleting] = useState(false);
 

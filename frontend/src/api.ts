@@ -1,4 +1,14 @@
-import type { Candidate, Document, MaintenanceEntry, Product, ProductDocument, ProductInput } from "./types";
+import type {
+  ApproveResult,
+  Candidate,
+  Document,
+  DiscoverResult,
+  Identification,
+  MaintenanceEntry,
+  Product,
+  ProductDocument,
+  ProductInput,
+} from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -17,6 +27,11 @@ export const api = {
   getProduct: (id: string) => request<Product>(`/api/products/${id}`),
   createProduct: (input: ProductInput) =>
     request<Product>("/api/products", { method: "POST", body: JSON.stringify(input) }),
+  identifyProduct: (description: string) =>
+    request<Identification>("/api/products/identify", {
+      method: "POST",
+      body: JSON.stringify({ description }),
+    }),
   updateProduct: (id: string, input: Partial<ProductInput>) =>
     request<Product>(`/api/products/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
   deleteProduct: (id: string) => request<void>(`/api/products/${id}`, { method: "DELETE" }),
@@ -46,9 +61,9 @@ export const api = {
       body: JSON.stringify(entry),
     }),
 
-  discoverManual: (productId: string) => request<Candidate[]>(`/api/products/${productId}/discover`),
+  discoverManual: (productId: string) => request<DiscoverResult>(`/api/products/${productId}/discover`),
   approveCandidate: (productId: string, candidate: Candidate, kind: string) =>
-    request<ProductDocument>(`/api/products/${productId}/discover/approve`, {
+    request<ApproveResult>(`/api/products/${productId}/discover/approve`, {
       method: "POST",
       body: JSON.stringify({ url: candidate.url, title: candidate.title, document_kind: kind }),
     }),

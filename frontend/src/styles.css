@@ -561,3 +561,59 @@ button {
   font-size: 13.5px;
   padding: 16px;
 }
+
+/* Trace panel ("what happened" admin view) */
+
+.trace-panel {
+  margin-top: 4px;
+}
+
+.trace-panel-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: var(--font);
+  cursor: pointer;
+}
+
+.trace-panel-toggle:hover {
+  color: var(--text);
+}
+
+.trace-panel-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.trace-panel-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  font-family: var(--mono);
+}
+
+.trace-panel-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.trace-panel-duration {
+  color: var(--text-faint);
+}
+
+.trace-panel-detail {
+  color: var(--text-muted);
+  font-family: var(--font);
+  flex-basis: 100%;
+}

@@ -1,3 +1,4 @@
+import logging
 import tempfile
 from datetime import date, datetime
 from decimal import Decimal
@@ -10,8 +11,12 @@ from ragapp.ingestion.service import IngestionError, ingest_pdf
 from ragapp.retrieval.store import VectorStore
 
 from hubapp.db import init_schema
+from hubapp.discovery.identify import IdentifyError, identify_product
 from hubapp.discovery.service import DiscoveryError, ingest_candidate, search_manual
+from hubapp.observability import Trace
 from hubapp.products.store import ProductStore
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s: %(message)s")
 
 app = FastAPI(title="rtfm-hub")
 init_schema()
@@ -124,6 +129,38 @@ class ApproveCandidateRequest(BaseModel):
     document_kind: str = "owners_manual"
 
 
+class IdentifyRequest(BaseModel):
+    description: str
+
+
+class TraceStepOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    detail: str
+    duration_ms: int
+
+
+class IdentificationOut(BaseModel):
+    brand: str | None
+    model: str | None
+    category: str | None
+    year: int | None
+    confidence: str
+    reasoning: str
+    trace: list[TraceStepOut]
+
+
+class DiscoverResponse(BaseModel):
+    candidates: list[CandidateOut]
+    trace: list[TraceStepOut]
+
+
+class ApproveResponse(BaseModel):
+    document: ProductDocumentOut
+    trace: list[TraceStepOut]
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
@@ -142,6 +179,30 @@ def list_products():
 @app.post("/api/products", response_model=ProductOut)
 def create_product(request: ProductCreate):
     return products.create(**request.model_dump())
+
+
+@app.post("/api/products/identify", response_model=IdentificationOut)
+def identify(request: IdentifyRequest):
+    """Search the web for the description, then have the LLM extract brand/model
+    from real results. No side effects — doesn't create a product; the frontend
+    shows this as a suggestion to confirm/edit before actually saving one.
+    """
+    if not request.description.strip():
+        raise HTTPException(status_code=400, detail="description is required")
+    trace = Trace()
+    try:
+        result = identify_product(request.description, trace=trace)
+    except IdentifyError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return IdentificationOut(
+        brand=result.brand,
+        model=result.model,
+        category=result.category,
+        year=result.year,
+        confidence=result.confidence,
+        reasoning=result.reasoning,
+        trace=trace.steps,
+    )
 
 
 @app.get("/api/products/{product_id}", response_model=ProductOut)
@@ -212,7 +273,7 @@ def add_maintenance(product_id: str, request: MaintenanceCreate):
     return products.add_maintenance(product_id, request.date, request.description, request.cost)
 
 
-@app.get("/api/products/{product_id}/discover", response_model=list[CandidateOut])
+@app.get("/api/products/{product_id}/discover", response_model=DiscoverResponse)
 def discover_manual(product_id: str):
     """Search + rank candidate manuals. No side effects — nothing is downloaded
     until a specific candidate is approved via the endpoint below.
@@ -220,10 +281,12 @@ def discover_manual(product_id: str):
     product = products.get(product_id)
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
-    return search_manual(product.brand, product.model, product.category)
+    trace = Trace()
+    candidates = search_manual(product.brand, product.model, product.category, trace=trace)
+    return DiscoverResponse(candidates=candidates, trace=trace.steps)
 
 
-@app.post("/api/products/{product_id}/discover/approve", response_model=ProductDocumentOut)
+@app.post("/api/products/{product_id}/discover/approve", response_model=ApproveResponse)
 def approve_candidate(product_id: str, request: ApproveCandidateRequest):
     """Download, verify, ingest, and link ONE candidate the user has explicitly
     approved. Never called automatically — see the standing rule in
@@ -231,7 +294,11 @@ def approve_candidate(product_id: str, request: ApproveCandidateRequest):
     """
     if products.get(product_id) is None:
         raise HTTPException(status_code=404, detail="Product not found")
+    trace = Trace()
     try:
-        return ingest_candidate(request.url, request.title, product_id, request.document_kind, products)
+        document = ingest_candidate(
+            request.url, request.title, product_id, request.document_kind, products, trace=trace
+        )
     except DiscoveryError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ApproveResponse(document=document, trace=trace.steps)
