@@ -58,19 +58,23 @@ through its FastAPI routes. Tracked as work items in rtfm-rag's own roadmap.
   app behaves identically otherwise. Not building this yet — see
   [05-roadmap.md](docs/specs/05-roadmap.md) for when.
 
-## Repo layout (planned — not built yet)
+## Repo layout
 
 ```
 rtfm-hub/
   backend/
     src/hubapp/
-      products/        Inventory CRUD, maintenance log
-      discovery/        Search backends (Tavily + keyless DuckDuckGo fallback), candidate ranking, download+handoff to ragapp's ingestion
-      routing/          Intent classification (manual vs. inventory question), product inference
-      ha/               HA-add-on-only: device-registry import (SUPERVISOR_TOKEN-gated)
+      products/        Inventory CRUD, maintenance log — built
+      discovery/        Search backends (Tavily + keyless DuckDuckGo fallback), ranking,
+                         download+verify+relevance-check+handoff to ragapp's ingestion — built
+      routing/          Intent classification (manual vs. inventory question), product
+                         inference — not built yet (Phase 3)
+      ha/               HA-add-on-only: device-registry import (SUPERVISOR_TOKEN-gated) —
+                         not built yet (Phase 4)
       api/              FastAPI app
   frontend/
-    src/               Inventory UI + chat UI (React + TS)
+    src/               Inventory UI (built: list/detail, forms, maintenance, discovery
+                        approval); chat UI not built yet (Phase 3)
   docs/specs/          Design docs — read before making architectural changes
 ```
 
@@ -88,10 +92,13 @@ approval, but nothing downloads or gets treated as authoritative until you confi
 
 ## Current status
 
-**Phase 1 done**: product CRUD, maintenance log, PDF upload → ingest (via
-`ragapp.ingestion.service.ingest_pdf`, in-process) → link-to-product, plus a full
-React frontend (product list/detail, add/edit, document linking, maintenance log),
-all verified live against the shared Postgres. No discovery agent or chat yet. See
+**Phase 1 and Phase 2 done**: product CRUD, maintenance log, PDF upload/link/
+discovery → ingest (via `ragapp.ingestion.service.ingest_pdf`, in-process) →
+link-to-product, plus a full React frontend for all of it. The discovery agent
+(`hubapp/discovery/`) is live against the real Tavily API — search, ranking, an
+approval UI, and a content-relevance check added after live testing surfaced a real
+failure (a search result whose title didn't match what its URL actually resolved
+to; see 03-manual-discovery.md). No query routing/chat yet. See
 [docs/specs/05-roadmap.md](docs/specs/05-roadmap.md).
 
 ## Prerequisites

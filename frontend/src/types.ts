@@ -38,6 +38,14 @@ export interface Document {
   title: string;
 }
 
+export interface Candidate {
+  title: string;
+  url: string;
+  domain: string;
+  source: string;
+  match_reasons: string[];
+}
+
 export interface MaintenanceEntry {
   id: string;
   product_id: string;

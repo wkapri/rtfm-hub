@@ -46,9 +46,17 @@ more irrelevant links to filter) — acceptable degradation, not a bug to fix la
    to plausible PDF links (either the URL ends in `.pdf`, or the result is on a
    domain that looks like the manufacturer's).
 4. Rank candidates — cheap heuristics, no LLM call needed for this part:
+   - A direct `.pdf` link outranks everything else, including an aggregator match —
+     an aggregator "manual" page (e.g. ManualsLib) is often an HTML viewer, not a
+     download, and fails step 7's PDF check; a real PDF link just works. Found via
+     live testing, not designed in upfront.
    - Manufacturer's own domain (or a known aggregator like manualslib.com) ranks
      above random third-party sites.
-   - Model number appearing in the URL or result title ranks above a generic match.
+   - Model number appearing in the URL or result title ranks above a generic match
+     — and when a model *is* specified but doesn't appear anywhere, that's a
+     penalty, not just a missed bonus. Also found via live testing: a manufacturer
+     domain can rank a PDF for a *different, newer* product above everything else
+     on domain authority alone.
    - Prefer results whose title suggests "owner's manual" / "user guide" over
      "service manual" / "parts list" as the default first candidate — user can still
      see and pick the others.
@@ -58,10 +66,19 @@ more irrelevant links to filter) — acceptable degradation, not a bug to fix la
 6. User approves one (or rejects all — no manual found, log it as such rather than
    silently failing).
 7. On approval: download the file, verify `Content-Type` is actually a PDF and the
-   size is sane (reject 0-byte or suspiciously huge files), then call `ragapp`'s
-   `ingest_pdf()` directly (in-process library call, not an HTTP request — see
-   [01-architecture.md](01-architecture.md)).
-8. Store the resulting `document_id` in `product_documents`.
+   size is sane (reject 0-byte or suspiciously huge files), **then check that the
+   product's brand or model actually appears somewhere in the first few pages of
+   extracted text** before committing to a full ingest. This step exists because of
+   a real failure during testing: a candidate titled "Roborock S7" from a short
+   domain resolved to an entirely unrelated PDF (a US Sentencing Commission
+   guidelines document) — which passed the content-type and size checks fine, since
+   it genuinely was a large, real PDF. The title and source of a search result are
+   not proof of what a URL actually resolves to. If the check fails, surface a clear
+   error and let the user try another candidate — same "no auto-selection" principle
+   as everywhere else in this flow.
+8. If all checks pass, call `ragapp`'s `ingest_pdf()` directly (in-process library
+   call, not an HTTP request — see [01-architecture.md](01-architecture.md)) and
+   store the resulting `document_id` in `product_documents`.
 
 ## What happens when nothing good is found
 

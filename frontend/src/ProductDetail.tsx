@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import { BackIcon, EditIcon, LinkIcon, TrashIcon, WrenchIcon } from "./Icons";
+import { categoryIcon } from "./categoryIcon";
+import DiscoverModal from "./DiscoverModal";
+import { BackIcon, EditIcon, LinkIcon, SearchIcon, TrashIcon, WrenchIcon } from "./Icons";
 import LinkDocumentModal from "./LinkDocumentModal";
 import MaintenanceForm from "./MaintenanceForm";
 import ProductForm from "./ProductForm";
@@ -24,6 +26,7 @@ export default function ProductDetail({ product, onBack, onUpdated, onDeleted }:
   const [maintenance, setMaintenance] = useState<MaintenanceEntry[] | null>(null);
   const [editing, setEditing] = useState(false);
   const [linkingDocument, setLinkingDocument] = useState(false);
+  const [discovering, setDiscovering] = useState(false);
   const [addingMaintenance, setAddingMaintenance] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -50,14 +53,19 @@ export default function ProductDetail({ product, onBack, onUpdated, onDeleted }:
       </button>
 
       <div className="detail-header">
-        <div>
-          <h1 className="detail-title">{product.nickname}</h1>
-          {(product.brand || product.model) && (
-            <p className="detail-subtitle">
-              {[product.brand, product.model].filter(Boolean).join(" ")}
-              {product.year ? ` · ${product.year}` : ""}
-            </p>
-          )}
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+          <span className="product-icon large" aria-hidden="true">
+            {categoryIcon(product.category)}
+          </span>
+          <div>
+            <h1 className="detail-title">{product.nickname}</h1>
+            {(product.brand || product.model) && (
+              <p className="detail-subtitle">
+                {[product.brand, product.model].filter(Boolean).join(" ")}
+                {product.year ? ` · ${product.year}` : ""}
+              </p>
+            )}
+          </div>
         </div>
         <div className="button-row">
           <button className="icon-button" onClick={() => setEditing(true)} aria-label="Edit">
@@ -100,9 +108,14 @@ export default function ProductDetail({ product, onBack, onUpdated, onDeleted }:
       <div className="section">
         <div className="section-header">
           <p className="section-title">Manuals</p>
-          <button className="button" onClick={() => setLinkingDocument(true)}>
-            <LinkIcon size={13} /> Add
-          </button>
+          <div className="button-row">
+            <button className="button" onClick={() => setDiscovering(true)}>
+              <SearchIcon size={13} /> Discover
+            </button>
+            <button className="button" onClick={() => setLinkingDocument(true)}>
+              <LinkIcon size={13} /> Add
+            </button>
+          </div>
         </div>
         {documents === null ? (
           <p className="loading-text">Loading…</p>
@@ -166,6 +179,17 @@ export default function ProductDetail({ product, onBack, onUpdated, onDeleted }:
           onClose={() => setLinkingDocument(false)}
           onLinked={(link) => {
             setLinkingDocument(false);
+            setDocuments((prev) => [...(prev ?? []), link]);
+          }}
+        />
+      )}
+
+      {discovering && (
+        <DiscoverModal
+          productId={product.id}
+          onClose={() => setDiscovering(false)}
+          onLinked={(link) => {
+            setDiscovering(false);
             setDocuments((prev) => [...(prev ?? []), link]);
           }}
         />

@@ -11,11 +11,15 @@ See [CLAUDE.md](CLAUDE.md) for the stack/architecture summary and
 
 ## Status
 
-**Phase 1 done, verified end to end**: product CRUD, maintenance log, PDF upload →
-ingest (via `ragapp`, in-process) → link-to-product, and a full React frontend for
-all of it (list/detail views, add/edit, document linking, maintenance log). No
-discovery agent yet, no query routing/chat — see
-[docs/specs/05-roadmap.md](docs/specs/05-roadmap.md) for what's next.
+**Phase 1 and Phase 2 done, verified end to end**: product CRUD, maintenance log,
+PDF upload/link/discovery → ingest (via `ragapp`, in-process) → link-to-product, and
+a full React frontend for all of it. The discovery agent (Tavily + keyless
+DuckDuckGo fallback, candidate ranking, an approval UI) is live — see
+[03-manual-discovery.md](docs/specs/03-manual-discovery.md) for a real failure it
+caught during testing (a search result whose title didn't match what its URL
+actually resolved to) and the content-relevance check added because of it. No query
+routing/chat yet — see [docs/specs/05-roadmap.md](docs/specs/05-roadmap.md) for
+what's next.
 
 ## Prerequisites
 
