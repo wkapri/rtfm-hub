@@ -11,19 +11,24 @@ See [CLAUDE.md](CLAUDE.md) for the stack/architecture summary and
 
 ## Status
 
-**Phase 1 and Phase 2 done, verified end to end**: product CRUD, maintenance log,
-PDF upload/link/discovery → ingest (via `ragapp`, in-process) → link-to-product, and
-a full React frontend for all of it. The discovery agent (Tavily + keyless
-DuckDuckGo fallback, candidate ranking, an approval UI) is live — see
-[03-manual-discovery.md](docs/specs/03-manual-discovery.md) for a real failure it
-caught during testing (a search result whose title didn't match what its URL
-actually resolved to) and the content-relevance check added because of it. Adding a
-product starts from a single description field now — an LLM identifies
-brand/model/category/year from live web search results for you to confirm, then
-discovery auto-runs on save. Every identify/discover/approve request is traced
-(steps + timings) and shown in the UI as a "What happened" panel. No query
-routing/chat yet — see [docs/specs/05-roadmap.md](docs/specs/05-roadmap.md) for
-what's next.
+**Phase 1 and Phase 2 done, verified end to end**: product CRUD, maintenance log
+(UI hidden, data kept), PDF upload/link/discovery → ingest (via `ragapp`,
+in-process) → link-to-product with the original PDF retained and viewable, and a
+full React frontend for all of it.
+
+Adding a product and finding its manual are both **real tool-calling agent
+loops** — search, fetch-and-verify, and (for discovery) heuristic-score are
+callable tools; each loop ends by calling a terminal tool with a structured
+result, not by parsing free text. Identification must be confirmed by the user
+before discovery even starts (the two loops share no tools), and
+downloading/ingesting a manual stays a plain human-approved action neither loop
+can trigger itself. See [06-agent-architecture.md](docs/specs/06-agent-architecture.md)
+for the design (including real small-model reliability quirks found via live
+testing) and [03-manual-discovery.md](docs/specs/03-manual-discovery.md) for the
+ranking heuristic and content-relevance safety check. Every identify/discover/
+approve request is traced (every model turn + tool call, with timings) and shown
+in the UI as a "What happened" panel. No query routing/chat yet — see
+[docs/specs/05-roadmap.md](docs/specs/05-roadmap.md) for what's next.
 
 ## Prerequisites
 

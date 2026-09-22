@@ -36,6 +36,18 @@
   trace (which search backend ran, what it found, verification results, timings),
   logged server-side and shown in the UI as a collapsible "What happened" panel —
   see [03-manual-discovery.md](03-manual-discovery.md).
+- [x] Ranking fix + PDF retention: candidate filtering now requires an actual
+  brand/model match (not just being a `.pdf` link) after live testing surfaced
+  completely unrelated PDFs passing through; ingested manuals' original PDF bytes
+  are now retained and servable (`GET /api/documents/{id}/file`) with "View"/
+  "Preview" links in the UI, instead of being discarded after ingestion.
+- [x] Real agent architecture: identify and discover are now tool-calling agent
+  loops (search, fetch-and-verify, heuristic-score as callable tools; a terminal
+  tool ends the loop with a structured result) instead of a single LLM call each.
+  Identification must be confirmed by the user before discovery's tools even
+  exist — the two loops don't share a tool namespace. Required a new
+  `complete_with_tools()` method on rtfm-rag's `LLMProvider`, implemented for all
+  three providers. See [06-agent-architecture.md](06-agent-architecture.md).
 
 **Phase 1 and Phase 2 are done.**
 

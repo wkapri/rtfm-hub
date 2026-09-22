@@ -1,14 +1,10 @@
-import pytest
-
-from hubapp.discovery.identify import IdentifyError, _parse_response
+from hubapp.discovery.identify import _coerce_identification
 
 
-def test_parses_well_formed_json():
-    raw = """{
-        "brand": "Roborock", "model": "S7", "category": "vacuum",
-        "year": 2022, "confidence": "high", "reasoning": "Exact match in results."
-    }"""
-    result = _parse_response(raw)
+def test_coerces_well_formed_data():
+    result = _coerce_identification(
+        {"brand": "Roborock", "model": "S7", "category": "vacuum", "year": 2022, "confidence": "high", "reasoning": "Exact match."}
+    )
 
     assert result.brand == "Roborock"
     assert result.model == "S7"
@@ -17,34 +13,37 @@ def test_parses_well_formed_json():
     assert result.confidence == "high"
 
 
-def test_extracts_json_even_with_surrounding_text():
-    raw = 'Sure, here is the identification:\n{"brand": "iRobot", "model": "Roomba j7", "category": null, "year": null, "confidence": "medium", "reasoning": "x"}\nHope that helps!'
-    result = _parse_response(raw)
-
-    assert result.brand == "iRobot"
-    assert result.model == "Roomba j7"
-    assert result.confidence == "medium"
-
-
 def test_invalid_confidence_falls_back_to_low():
-    raw = '{"brand": "X", "model": "Y", "category": null, "year": null, "confidence": "very sure", "reasoning": "x"}'
-    result = _parse_response(raw)
+    result = _coerce_identification({"brand": "X", "model": "Y", "confidence": "very sure"})
+
+    assert result.confidence == "low"
+
+
+def test_missing_confidence_falls_back_to_low():
+    result = _coerce_identification({"brand": "X", "model": "Y"})
 
     assert result.confidence == "low"
 
 
 def test_non_integer_year_becomes_none():
-    raw = '{"brand": "X", "model": "Y", "category": null, "year": "unknown", "confidence": "low", "reasoning": "x"}'
-    result = _parse_response(raw)
+    result = _coerce_identification({"brand": "X", "model": "Y", "year": "unknown"})
 
     assert result.year is None
 
 
-def test_no_json_raises_identify_error():
-    with pytest.raises(IdentifyError):
-        _parse_response("I'm not sure, sorry, no JSON here.")
+def test_missing_fields_become_none_or_empty():
+    result = _coerce_identification({})
+
+    assert result.brand is None
+    assert result.model is None
+    assert result.category is None
+    assert result.year is None
+    assert result.confidence == "low"
+    assert result.reasoning == ""
 
 
-def test_malformed_json_raises_identify_error():
-    with pytest.raises(IdentifyError):
-        _parse_response("{brand: Roborock, not valid json}")
+def test_null_brand_and_model_pass_through():
+    result = _coerce_identification({"brand": None, "model": None, "confidence": "low", "reasoning": "Too vague."})
+
+    assert result.brand is None
+    assert result.model is None

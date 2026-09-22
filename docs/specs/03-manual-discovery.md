@@ -1,5 +1,13 @@
 # Manual Discovery Agent
 
+Both discovery and product identification are now real tool-calling agent loops,
+not fixed pipelines with a single LLM call — see
+[06-agent-architecture.md](06-agent-architecture.md) for the loop mechanics
+(how tools are called, the terminal-tool pattern, small-model reliability
+handling). This doc covers the domain-specific pieces: what the ranking
+heuristic does (now offered to the agent as a `score_heuristic` tool rather
+than always running), the content-relevance safety check, and PDF retention.
+
 ## Standing rule
 
 **Never downloads a file without the user approving that specific candidate first.**
@@ -38,25 +46,29 @@ more irrelevant links to filter) — acceptable degradation, not a bug to fix la
 ## Flow
 
 1. Triggered when a product is added (or manually re-triggered from the product page
-   if the first search found nothing good).
-2. Build a search query from the product's brand + model + category, e.g.
-   `"Roborock S7 owner's manual filetype:pdf"`. Category helps disambiguate generic
-   model numbers.
-3. Call the active search backend (Tavily or the DuckDuckGo fallback). Filter results
-   to plausible candidates: the manufacturer's own domain, a known aggregator
-   (manualslib.com etc.), or a direct `.pdf` link that actually mentions the
-   product's brand or model somewhere in its title/URL. That last clause matters —
-   being a `.pdf` link is *not* enough on its own. Found via live testing: searching
-   for a Subaru's manual returned completely unrelated PDFs (a solar-charger
-   manual, a state DMV handbook) that used to pass this filter purely because the
-   URL ended in `.pdf`, with no check that they had anything to do with the
-   product. If nothing plausible survives the filter, that's an honest empty
-   result — see "What happens when nothing good is found" below.
-4. Rank the survivors — cheap heuristics, no LLM call needed for this part:
+   if the first search found nothing good). Only ever runs against an
+   already-confirmed brand/model — see 06-agent-architecture.md for why that's
+   structurally guaranteed, not just convention.
+2. The discovery agent (`hubapp/discovery/service.py`, `search_manual`) searches
+   the web, can fetch a candidate's actual content to check it before
+   recommending it, and can run the ranking heuristic below as a `score_heuristic`
+   tool for a second opinion — as many times as it decides it needs, not a fixed
+   one-shot search. It ends by calling `propose_candidates` with up to 3 ranked
+   candidates and a reason for each, or an empty list if nothing plausible turned
+   up (see "What happens when nothing good is found" below).
+3. The ranking heuristic itself (`hubapp/discovery/ranking.py`, `rank_candidates`)
+   is unchanged cheap string-matching — no LLM call needed for it specifically:
+   - Only candidates on the manufacturer's own domain, a known aggregator
+     (manualslib.com etc.), or a direct `.pdf` link that actually mentions the
+     product's brand or model in its title/URL are considered at all — being a
+     `.pdf` link is *not* enough on its own. Found via live testing: searching
+     for a Subaru's manual returned completely unrelated PDFs (a solar-charger
+     manual, a state DMV handbook) that used to pass this filter purely because
+     the URL ended in `.pdf`.
    - A direct `.pdf` link outranks everything else, including an aggregator match —
      an aggregator "manual" page (e.g. ManualsLib) is often an HTML viewer, not a
-     download, and fails step 7's PDF check; a real PDF link just works. Found via
-     live testing, not designed in upfront.
+     download, and fails the approval-time PDF check; a real PDF link just works.
+     Found via live testing, not designed in upfront.
    - Manufacturer's own domain (or a known aggregator like manualslib.com) ranks
      above random third-party sites.
    - Model number appearing in the URL or result title ranks above a generic match
@@ -67,14 +79,14 @@ more irrelevant links to filter) — acceptable degradation, not a bug to fix la
    - Prefer results whose title suggests "owner's manual" / "user guide" over
      "service manual" / "parts list" as the default first candidate — user can still
      see and pick the others.
-5. Return top 3 candidates to the frontend: title, source URL, domain, and which
-   heuristics matched (so the user can judge confidence themselves, not just trust a
-   score). Each candidate also links directly to its source URL ("Preview") so the
-   user can open and look at the actual page/file before approving anything — not
-   just trust the title.
-6. User approves one (or rejects all — no manual found, log it as such rather than
+4. The frontend shows the agent's final candidates: title, source URL, domain, and
+   its stated reasoning (so the user can judge confidence themselves, not just
+   trust a score). Each candidate also links directly to its source URL ("Preview")
+   so the user can open and look at the actual page/file before approving
+   anything — not just trust the title or the agent's reasoning.
+5. User approves one (or rejects all — no manual found, log it as such rather than
    silently failing).
-7. On approval: download the file, verify `Content-Type` is actually a PDF and the
+6. On approval: download the file, verify `Content-Type` is actually a PDF and the
    size is sane (reject 0-byte or suspiciously huge files), **then check that the
    product's brand or model actually appears somewhere in the first few pages of
    extracted text** before committing to a full ingest. This step exists because of
@@ -88,7 +100,7 @@ more irrelevant links to filter) — acceptable degradation, not a bug to fix la
    manual for a different model from the same brand can still pass it — filtering
    already keeps most of these out at step 3, but it's not a full model-match
    guarantee, which is what the "Preview" link is for.
-8. If all checks pass, call `ragapp`'s `ingest_pdf()` directly (in-process library
+7. If all checks pass, call `ragapp`'s `ingest_pdf()` directly (in-process library
    call, not an HTTP request — see [01-architecture.md](01-architecture.md)) and
    store the resulting `document_id` in `product_documents`. The original PDF bytes
    are also saved to `MANUALS_DIR` (`hubapp/storage.py`), keyed by `document_id` —
@@ -110,47 +122,34 @@ inventory without a manual; that's a valid state, not an error state.
 ## Product identification ("smart add")
 
 Adding a product starts from a single free-text description ("roomba", "2013 subaru
-xv crosstrek") instead of a blank form with every field. Flow:
+xv crosstrek") instead of a blank form with every field. The identification agent
+(`hubapp/discovery/identify.py`) searches the web and can fetch a page to confirm a
+detail, as many times as it needs, before reporting `{brand, model, category, year,
+confidence, reasoning}` via its terminal tool. Confidence is explicitly `"low"`
+rather than a confident-sounding guess when it can't pin down a specific
+brand/model. The user sees this (confidence badge + reasoning, collapsible trace)
+with all fields pre-filled but still editable, confirms and saves, and discovery
+runs automatically against the new product — no separate "now go find a manual"
+step. See [06-agent-architecture.md](06-agent-architecture.md) for the loop
+mechanics both agents share, and for the history of what this replaced (a single
+LLM call parsing raw JSON out of free text, including a real context-window
+truncation bug found via live testing).
 
-1. Web search for `"{description} product specifications"` via the same
-   `SearchBackend` used for manual discovery (Tavily/DuckDuckGo).
-2. The LLM (via `ragapp`'s pluggable `LLMProvider`, using its `system_prompt`
-   override — see below) extracts structured `{brand, model, category, year,
-   confidence, reasoning}` from the search results. Confidence is explicitly
-   `"low"` rather than a confident-sounding guess when the results don't clearly
-   identify a specific brand/model.
-3. The user sees the identification (confidence badge + reasoning) with all fields
-   pre-filled but still editable, then confirms and saves. If identification fails
-   outright, the description becomes the nickname and every field is blank/editable
-   — same manual-entry fallback, just without a wasted round trip.
-4. On save, discovery (the flow above) runs automatically against the new product —
-   no separate "now go find a manual" step.
-
-This required extending rtfm-rag's `LLMProvider.chat_stream()` with an optional
-`system_prompt` parameter: it was hardcoded to the RAG manual-Q&A prompt, which made
-it unusable for a non-RAG extraction task despite rtfm-hub's own docs already
-describing the interface as shared "by both RAG generation and query routing." All
-three providers (Ollama/OpenAI-compatible/Anthropic) default to the existing prompt,
-so RAG callers are unaffected.
-
-**Context-window truncation bug** (found via live testing, twice): Ollama's chat
-`num_ctx` is tuned for RAG chat (2048 tokens, sized for shorter retrieval contexts).
-Search-result snippets for identification can be much longer (full articles/reviews),
-and once combined with the system prompt they left too little budget for the model's
-own JSON output — responses were cut off mid-sentence with no closing brace. Fixed
-with two layers: (1) truncate each snippet to 350 chars and keep the "reasoning"
-field short by instruction (under 15 words), and (2) if the response still comes back
-unparsable, retry once with titles-only context (no snippets) — a much smaller
-footprint that's usually still enough to identify a well-known brand/model.
+This required extending rtfm-rag's `LLMProvider` with `complete_with_tools()` (all
+three providers — Ollama/OpenAI-compatible/Anthropic): the existing
+`chat_stream()` is plain text-in/text-out with no concept of tool calls, and RAG
+chat still uses it unchanged.
 
 ## Observability
 
 Every identify/discover/approve request builds a `Trace` (`hubapp/observability.py`)
-— a list of named steps with a human-readable detail and duration, e.g.:
+— a list of named steps with a human-readable detail and duration. For the agent
+loops, that's every model turn and every tool call, e.g.:
 
 ```
-web_search        1708ms   TavilyBackend: 5 result(s) for '2021 tesla model 3'
-llm_identify      1099ms   Tesla Model 3 (high)
+agent_turn          546ms   called web_search
+tool:web_search     1733ms  - Smart Thermostat Enhanced | ecobee ...
+agent_turn          2348ms  called propose_identification
 ```
 
 Each step is logged server-side as it completes (so `docker logs` / the uvicorn

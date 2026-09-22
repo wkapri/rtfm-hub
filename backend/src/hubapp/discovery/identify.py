@@ -1,28 +1,59 @@
-import json
-import re
 from dataclasses import dataclass
 
+from ragapp.llm.base import ToolSpec
 from ragapp.llm.factory import create_llm_client
 
-from hubapp.discovery.base import SearchResult
+from hubapp.agent import AgentError, Tool, run_agent_loop
+from hubapp.config import settings
 from hubapp.discovery.factory import create_search_backend
+from hubapp.discovery.fetch import FetchError, fetch_preview
 from hubapp.observability import Trace
 
-SYSTEM_PROMPT = (
-    "You identify consumer products from a short user description and web search "
-    'results. Respond with ONLY a JSON object, no other text, with these exact '
-    'keys: "brand" (string or null), "model" (string or null), "category" '
-    '(string or null, e.g. "vacuum"), "year" (integer or null, model year if '
-    'apparent), "confidence" ("high", "medium", or "low"), "reasoning" (under 15 '
-    'words explaining your answer — a phrase, not a paragraph). If the description '
-    "and search results don't clearly identify a specific brand/model, set "
-    'brand/model to null and confidence to "low" rather than guessing — a wrong '
-    "confident-sounding guess is worse than admitting uncertainty."
+_SYSTEM_PROMPT = (
+    "You identify the exact consumer product a user is describing — the specific "
+    "brand and model, confirmed, not just a best guess. You have tools to search "
+    "the web and fetch a page's content. Search first. If the results are "
+    "ambiguous, too generic, or don't clearly confirm one specific model, search "
+    "again with a narrower or different query, or fetch a promising page (a "
+    "product listing, spec sheet, review) to confirm a detail — do this as many "
+    "times as you need before answering. Once you're confident (or confident you "
+    "can't do better with more searching), call propose_identification exactly "
+    "once. Set brand/model to null and confidence to \"low\" rather than "
+    "guessing — a wrong confident-sounding guess is worse than admitting "
+    "uncertainty, and this identification gates everything downstream (a manual "
+    "search only starts once the user has confirmed it)."
 )
+
+_PROPOSE_IDENTIFICATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "brand": {"type": ["string", "null"]},
+        "model": {"type": ["string", "null"]},
+        "category": {"type": ["string", "null"], "description": 'e.g. "vacuum"'},
+        "year": {"type": ["integer", "null"], "description": "Model year, if apparent."},
+        "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+        "reasoning": {"type": "string", "description": "One short phrase explaining the answer."},
+    },
+    "required": ["brand", "model", "category", "year", "confidence", "reasoning"],
+}
+
+_WEB_SEARCH_SCHEMA = {
+    "type": "object",
+    "properties": {"query": {"type": "string"}},
+    "required": ["query"],
+}
+
+_FETCH_PAGE_SCHEMA = {
+    "type": "object",
+    "properties": {"url": {"type": "string"}},
+    "required": ["url"],
+}
+
+_FETCH_PREVIEW_CHARS = 1200
 
 
 class IdentifyError(Exception):
-    """The LLM's response couldn't be parsed as a valid identification."""
+    """The identification agent didn't reach a usable answer."""
 
 
 @dataclass
@@ -35,73 +66,67 @@ class Identification:
     reasoning: str
 
 
-_MAX_RESULTS = 5
-_MAX_SNIPPET_CHARS = 350  # some search results are full news articles, not short
-# snippets — without a cap, 5 of those can eat most of the 2048-token context
-# budget (tuned for RAG chat's shorter context) before the model even starts
-# answering, truncating its JSON output mid-response. Found via live testing:
-# a real query returned a response cut off with no closing brace. That first
-# pass still wasn't enough headroom on some queries (verbose review-style
-# snippets, or the model rambling in "reasoning"), so on a truncated/unparsable
-# response we retry once with titles only — much smaller footprint, usually
-# still enough to identify a well-known brand/model.
-
-
 def identify_product(description: str, trace: Trace | None = None) -> Identification:
-    """Search the web for the description, then have the LLM extract brand/model
-    from real search results — more accurate for new/obscure products than
-    relying on the LLM's own (dated) training knowledge alone.
+    """Run the identification agent: given a bare description, it searches the
+    web (and can fetch a page to confirm a detail) until it's confident about
+    the exact brand/model, then reports a structured answer via its terminal
+    tool. This result still isn't trusted outright — the frontend always shows
+    it as an editable suggestion for the user to confirm before a product is
+    created, and manual discovery (a separate agent) never runs until that
+    confirmation happens. See docs/specs/06-agent-architecture.md.
     """
     trace = trace if trace is not None else Trace()
-    backend = create_search_backend()
+    llm = create_llm_client(settings.agent_llm_provider)
 
-    with trace.step("web_search") as s:
-        results = backend.search(f"{description} product specifications", max_results=_MAX_RESULTS)
-        s.detail = f"{type(backend).__name__}: {len(results)} result(s) for {description!r}"
+    def _tool_web_search(query: str) -> str:
+        backend = create_search_backend()
+        results = backend.search(query, max_results=5)
+        if not results:
+            return "No results found."
+        return "\n".join(f"- {r.title}\n  {r.url}\n  {(r.snippet or '')[:300]}".rstrip() for r in results)
 
-    user_message = f'Product description: "{description}"'
-    llm = create_llm_client()
-
-    with trace.step("llm_identify") as s:
-        context = _build_context(results, include_snippets=True)
-        raw = "".join(llm.chat_stream(user_message, context, system_prompt=SYSTEM_PROMPT))
+    def _tool_fetch_page(url: str) -> str:
         try:
-            identification = _parse_response(raw)
-            s.detail = f"{identification.brand} {identification.model} ({identification.confidence})"
-            return identification
-        except IdentifyError:
-            s.detail = "response truncated/unparsable, retrying with titles only"
+            preview = fetch_preview(url)
+        except FetchError as exc:
+            return str(exc)
+        return f"content-type: {preview.content_type}\n\n{preview.text[:_FETCH_PREVIEW_CHARS]}"
 
-    with trace.step("llm_identify_retry") as s:
-        context = _build_context(results, include_snippets=False)
-        raw = "".join(llm.chat_stream(user_message, context, system_prompt=SYSTEM_PROMPT))
-        identification = _parse_response(raw)
-        s.detail = f"{identification.brand} {identification.model} ({identification.confidence})"
-        return identification
-
-
-def _build_context(results: list[SearchResult], include_snippets: bool) -> str:
-    if include_snippets:
-        parts = [
-            f"{r.title}\n{(r.snippet or '')[:_MAX_SNIPPET_CHARS]}".strip()
-            for r in results
-            if r.title or r.snippet
-        ]
-    else:
-        parts = [r.title for r in results if r.title]
-    return "\n\n".join(parts) or "(no search results found)"
-
-
-def _parse_response(raw: str) -> Identification:
-    match = re.search(r"\{.*\}", raw, re.DOTALL)
-    if not match:
-        raise IdentifyError(f"Model response wasn't valid JSON: {raw[:200]!r}")
+    tools = [
+        Tool(
+            ToolSpec("web_search", "Search the web for information about a product.", _WEB_SEARCH_SCHEMA),
+            _tool_web_search,
+        ),
+        Tool(
+            ToolSpec("fetch_page", "Fetch a URL and return a text preview of its content.", _FETCH_PAGE_SCHEMA),
+            _tool_fetch_page,
+        ),
+        Tool(
+            ToolSpec(
+                "propose_identification",
+                "Report the identified product. Call this exactly once, when done.",
+                _PROPOSE_IDENTIFICATION_SCHEMA,
+            ),
+            lambda **kw: kw,
+        ),
+    ]
 
     try:
-        data = json.loads(match.group(0))
-    except json.JSONDecodeError as exc:
-        raise IdentifyError(f"Model response wasn't valid JSON: {raw[:200]!r}") from exc
+        result = run_agent_loop(
+            llm=llm,
+            system_prompt=_SYSTEM_PROMPT,
+            user_message=f'Product description: "{description}"',
+            tools=tools,
+            terminal_tool_name="propose_identification",
+            trace=trace,
+        )
+    except AgentError as exc:
+        raise IdentifyError(str(exc)) from exc
 
+    return _coerce_identification(result)
+
+
+def _coerce_identification(data: dict) -> Identification:
     confidence = data.get("confidence") or "low"
     if confidence not in ("high", "medium", "low"):
         confidence = "low"

@@ -299,7 +299,15 @@ def discover_manual(product_id: str):
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found")
     trace = Trace()
-    candidates = search_manual(product.brand, product.model, product.category, trace=trace)
+    try:
+        candidates = search_manual(product.brand, product.model, product.category, trace=trace)
+    except DiscoveryError:
+        # The agent loop failing to reach a clean answer (rambled instead of
+        # calling its terminal tool, hit the iteration cap) degrades to the
+        # same "nothing found" empty state as a genuinely empty search — not
+        # an error dialog. The trace (already populated up to the failure)
+        # still shows what was tried, so it's not opaque, just empty-handed.
+        candidates = []
     return DiscoverResponse(candidates=candidates, trace=trace.steps)
 
 

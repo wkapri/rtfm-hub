@@ -92,19 +92,29 @@ approval, but nothing downloads or gets treated as authoritative until you confi
 
 ## Current status
 
-**Phase 1 and Phase 2 done**: product CRUD, maintenance log, PDF upload/link/
-discovery → ingest (via `ragapp.ingestion.service.ingest_pdf`, in-process) →
-link-to-product, plus a full React frontend for all of it. The discovery agent
-(`hubapp/discovery/`) is live against the real Tavily API — search, ranking, an
-approval UI, and a content-relevance check added after live testing surfaced a real
-failure (a search result whose title didn't match what its URL actually resolved
-to; see 03-manual-discovery.md). Adding a product now starts from a single
-free-text description instead of a blank form — the discovery agent's search
-backend plus an LLM extraction step identify brand/model/category/year for the
-user to confirm/edit, then discovery auto-runs on save (see 03-manual-discovery.md's
-"Product identification" section). Every identify/discover/approve request is
-traced (steps + timings), logged server-side and shown in the UI as a "What
-happened" panel (`hubapp/observability.py`). No query routing/chat yet. See
+**Phase 1 and Phase 2 done**: product CRUD, maintenance log (UI hidden, data model
+kept), PDF upload/link/discovery → ingest (via `ragapp.ingestion.service.ingest_pdf`,
+in-process) → link-to-product, plus a full React frontend for all of it. Ingested
+manuals' original PDFs are retained and viewable (`GET /api/documents/{id}/file`),
+not just chunked into the vector store and discarded.
+
+Product identification (a single free-text description → confirmed brand/model)
+and manual discovery are both **real tool-calling agent loops** now, not a single
+LLM call each — the model can search again, fetch a page to verify a detail, or
+score candidates with the old heuristic ranking, as many times as it needs before
+answering via a terminal tool. Identification must be confirmed by the user before
+discovery's tools even exist (the two loops share no tool namespace), and
+downloading/ingesting stays a plain human-approved action, never a tool either
+loop can call. Required a new `complete_with_tools()` method on rtfm-rag's
+`LLMProvider`, implemented across all three providers. See
+[docs/specs/06-agent-architecture.md](docs/specs/06-agent-architecture.md) for the
+loop mechanics (including real small-model reliability quirks found via live
+testing) and [docs/specs/03-manual-discovery.md](docs/specs/03-manual-discovery.md)
+for the domain-specific pieces (ranking heuristic, content-relevance check).
+
+Every identify/discover/approve request is traced (every model turn + tool call,
+with timings), logged server-side and shown in the UI as a "What happened" panel
+(`hubapp/observability.py`). No query routing/chat yet. See
 [docs/specs/05-roadmap.md](docs/specs/05-roadmap.md).
 
 ## Prerequisites
